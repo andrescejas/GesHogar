@@ -52,7 +52,9 @@ const Dashboard = () => {
       .filter(c => c.tipo === 'egreso')
       .map(cat => ({
         name: cat.nombre,
-        value: movs.filter(m => m.categoriaId === cat.id || m.categoria === cat.nombre).reduce((acc, m) => acc + Number(m.monto), 0),
+        value: movs
+          .filter(m => (m.categoriaId === cat.id || m.categoria === cat.nombre) && m.estado !== 'proyectado')
+          .reduce((acc, m) => acc + (Number(m.monto) || 0), 0),
         color: cat.color || '#cbd5e1'
       }))
       .filter(d => d.value > 0);
@@ -73,9 +75,9 @@ const Dashboard = () => {
   if (loading) return <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin mr-2" /> Cargando datos...</div>;
 
   const stats = [
-    { title: 'Ingresos Reales', value: dataMes.ingresosReales, sub: `Proyectado: $${dataMes.ingresosProyectados.toLocaleString()}`, icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-    { title: 'Gastos Reales', value: dataMes.egresosReales, sub: `Proyectado: $${dataMes.egresosProyectados.toLocaleString()}`, icon: TrendingDown, color: 'text-rose-500', bg: 'bg-rose-50' },
-    { title: 'Ahorro Real', value: dataMes.ahorroReal, sub: `Meta: $${dataMes.ahorroProyectado.toLocaleString()}`, icon: Wallet, color: 'text-indigo-500', bg: 'bg-indigo-50' },
+    { title: 'Ingresos Reales', value: dataMes.ingresosReales, sub: `Proyectado: $${dataMes.ingresosProyectados.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+    { title: 'Gastos Reales', value: dataMes.egresosReales, sub: `Proyectado: $${dataMes.egresosProyectados.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, icon: TrendingDown, color: 'text-rose-500', bg: 'bg-rose-50' },
+    { title: 'Ahorro Real', value: dataMes.ahorroReal, sub: `Meta: $${dataMes.ahorroProyectado.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, icon: Wallet, color: 'text-indigo-500', bg: 'bg-indigo-50' },
     { title: 'Diferencia de Ahorro', value: dataMes.diferenciaAhorro, sub: 'Real vs Meta', icon: ArrowRightLeft, color: dataMes.diferenciaAhorro >= 0 ? 'text-blue-500' : 'text-amber-500', bg: 'bg-blue-50', showPlus: true },
   ];
 
@@ -106,7 +108,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-black">
-                {stat.showPlus && stat.value > 0 ? '+' : ''}${stat.value.toLocaleString()}
+                {stat.showPlus && stat.value > 0 ? '+' : ''}${stat.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <p className="text-[10px] font-bold text-muted-foreground mt-1 opacity-70 group-hover:opacity-100 transition-opacity">
                 {stat.sub}
@@ -130,6 +132,7 @@ const Dashboard = () => {
                 <Tooltip 
                   cursor={{fill: '#f8fafc'}} 
                   contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
+                  formatter={(value) => `$${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
                 <Legend />
                 <Bar dataKey="Proyectado" fill="#cbd5e1" radius={[4, 4, 0, 0]} barSize={40} />
@@ -162,6 +165,7 @@ const Dashboard = () => {
                   </Pie>
                   <Tooltip 
                     contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
+                    formatter={(value) => `$${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                   />
                   <Legend iconType="circle" />
                 </PieChart>

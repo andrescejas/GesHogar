@@ -139,7 +139,7 @@ const Movimientos = () => {
                     <td className="p-4 align-middle">{m.descripcion}</td>
                     <td className="p-4 align-middle">{m.responsable}</td>
                     <td className="p-4 align-middle text-right font-medium">
-                      {m.tipo === 'ingreso' ? '+' : '-'}${Number(m.monto).toLocaleString()}
+                      {m.tipo === 'ingreso' ? '+' : '-'}${Number(m.monto).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td className="p-4 align-middle">
                       <span className={cn(

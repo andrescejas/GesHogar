@@ -130,13 +130,13 @@ const Comparativo = () => {
                             <span className="text-[10px] uppercase text-muted-foreground">{c.tipo}</span>
                           </div>
                         </td>
-                        <td className="p-4 align-middle text-right text-muted-foreground">${c.proyectado.toLocaleString()}</td>
-                        <td className="p-4 align-middle text-right font-medium">${c.real.toLocaleString()}</td>
+                        <td className="p-4 align-middle text-right text-muted-foreground">${c.proyectado.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="p-4 align-middle text-right font-medium">${c.real.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         <td className={cn(
                           "p-4 align-middle text-right font-bold",
                           c.diferencia >= 0 ? "text-emerald-600" : "text-rose-600"
                         )}>
-                          {c.diferencia > 0 ? '+' : ''}${c.diferencia.toLocaleString()}
+                          {c.diferencia > 0 ? '+' : ''}${c.diferencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                         <td className="p-4 align-middle">
                           <div className="flex flex-col items-center gap-1">
@@ -149,7 +149,7 @@ const Comparativo = () => {
                                 style={{ width: `${Math.min(c.porcentaje, 100)}%` }}
                               />
                             </div>
-                            <span className="text-[10px] font-bold">{c.porcentaje.toFixed(0)}%</span>
+                            <span className="text-[10px] font-bold">{c.porcentaje.toFixed(1)}%</span>
                           </div>
                         </td>
                       </tr>
@@ -172,7 +172,7 @@ const ResumenCard = ({ title, value, sub, color, icon: Icon, showPlus = false })
     </CardHeader>
     <CardContent>
       <div className={cn("text-3xl font-black", color)}>
-        {showPlus && value > 0 ? '+' : ''}${Number(value).toLocaleString()}
+        {showPlus && value > 0 ? '+' : ''}${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </div>
       <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
         {Icon && <Icon className="h-3 w-3" />}

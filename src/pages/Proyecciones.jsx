@@ -146,7 +146,7 @@ const Proyecciones = () => {
                   {p.descripcion || '-'}
                 </td>
                 <td className="p-2 text-right font-bold">
-                  ${(p.montoProyectado || 0).toLocaleString()}
+                  ${(p.montoProyectado || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
                 <td className="p-2 text-right flex justify-end gap-1">
                   <Button variant="ghost" size="sm" className="text-indigo-600 h-7 w-7 p-0" onClick={() => handleOpenModal(p)}>
@@ -218,13 +218,13 @@ const Proyecciones = () => {
             <div>
               <p className="text-xs opacity-60 uppercase font-bold">Total Ingresos</p>
               <p className="text-2xl font-bold text-emerald-400">
-                ${proyeccionesList.filter(p => p.tipo === 'ingreso').reduce((acc, p) => acc + (Number(p.montoProyectado) || 0), 0).toLocaleString()}
+                ${proyeccionesList.filter(p => p.tipo === 'ingreso').reduce((acc, p) => acc + (Number(p.montoProyectado) || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
             <div>
               <p className="text-xs opacity-60 uppercase font-bold">Total Gastos</p>
               <p className="text-2xl font-bold text-rose-400">
-                ${proyeccionesList.filter(p => p.tipo === 'egreso').reduce((acc, p) => acc + (Number(p.montoProyectado) || 0), 0).toLocaleString()}
+                ${proyeccionesList.filter(p => p.tipo === 'egreso').reduce((acc, p) => acc + (Number(p.montoProyectado) || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
             <div>
@@ -233,7 +233,7 @@ const Proyecciones = () => {
                 ${(
                   proyeccionesList.filter(p => p.tipo === 'ingreso').reduce((acc, p) => acc + (Number(p.montoProyectado) || 0), 0) - 
                   proyeccionesList.filter(p => p.tipo === 'egreso').reduce((acc, p) => acc + (Number(p.montoProyectado) || 0), 0)
-                ).toLocaleString()}
+                ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
           </div>
