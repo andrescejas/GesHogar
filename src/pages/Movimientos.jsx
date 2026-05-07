@@ -15,9 +15,10 @@ const Movimientos = () => {
     fecha: new Date().toISOString().split('T')[0],
     tipo: 'egreso',
     categoriaId: '',
+    subcategoria: '',
     descripcion: '',
     monto: '',
-    responsable: '',
+    responsable: 'Andres',
     estado: 'pagado'
   });
 
@@ -43,9 +44,10 @@ const Movimientos = () => {
       fecha: m.fecha,
       tipo: m.tipo,
       categoriaId: m.categoriaId || '',
-      descripcion: m.descripcion,
+      subcategoria: m.subcategoria || '',
+      descripcion: m.descripcion || '',
       monto: m.monto,
-      responsable: m.responsable,
+      responsable: m.responsable || 'Andres',
       estado: m.estado
     });
     setIsModalOpen(true);
@@ -64,9 +66,10 @@ const Movimientos = () => {
       fecha: new Date().toISOString().split('T')[0],
       tipo: 'egreso',
       categoriaId: '',
+      subcategoria: '',
       descripcion: '',
       monto: '',
-      responsable: '',
+      responsable: 'Andres',
       estado: 'pagado'
     });
   };
@@ -114,6 +117,7 @@ const Movimientos = () => {
                   <th className="h-12 px-4 text-left align-middle text-muted-foreground">Fecha</th>
                   <th className="h-12 px-4 text-left align-middle text-muted-foreground">Tipo</th>
                   <th className="h-12 px-4 text-left align-middle text-muted-foreground">Categoría</th>
+                  <th className="h-12 px-4 text-left align-middle text-muted-foreground">Subcategoría</th>
                   <th className="h-12 px-4 text-left align-middle text-muted-foreground">Descripción</th>
                   <th className="h-12 px-4 text-left align-middle text-muted-foreground">Responsable</th>
                   <th className="h-12 px-4 text-right align-middle text-muted-foreground">Monto</th>
@@ -136,8 +140,9 @@ const Movimientos = () => {
                     <td className="p-4 align-middle">
                       {categorias.find(c => c.id === m.categoriaId)?.icono} {categorias.find(c => c.id === m.categoriaId)?.nombre || 'Sin categoría'}
                     </td>
+                    <td className="p-4 align-middle">{m.subcategoria}</td>
                     <td className="p-4 align-middle">{m.descripcion}</td>
-                    <td className="p-4 align-middle">{m.responsable}</td>
+                    <td className="p-4 align-middle font-medium">{m.responsable}</td>
                     <td className="p-4 align-middle text-right font-medium">
                       {m.tipo === 'ingreso' ? '+' : '-'}${Number(m.monto).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
@@ -204,6 +209,17 @@ const Movimientos = () => {
           </div>
 
           <div className="space-y-2">
+            <label className="text-sm font-medium">Subcategoría</label>
+            <input 
+              type="text" 
+              className="w-full p-2 border rounded-md bg-background" 
+              placeholder="Ej: Visa, Patente, Gym..."
+              value={formData.subcategoria} 
+              onChange={(e) => setFormData({...formData, subcategoria: e.target.value})} 
+            />
+          </div>
+
+          <div className="space-y-2">
             <label className="text-sm font-medium">Descripción</label>
             <input type="text" className="w-full p-2 border rounded-md bg-background" required value={formData.descripcion} onChange={(e) => setFormData({...formData, descripcion: e.target.value})} />
           </div>
@@ -215,7 +231,16 @@ const Movimientos = () => {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Responsable</label>
-              <input type="text" className="w-full p-2 border rounded-md bg-background" required value={formData.responsable} onChange={(e) => setFormData({...formData, responsable: e.target.value})} />
+              <select 
+                className="w-full p-2 border rounded-md bg-background" 
+                required 
+                value={formData.responsable} 
+                onChange={(e) => setFormData({...formData, responsable: e.target.value})}
+              >
+                <option value="Andres">Andres</option>
+                <option value="Cecilia">Cecilia</option>
+                <option value="Agustin">Agustin</option>
+              </select>
             </div>
           </div>
 

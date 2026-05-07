@@ -15,8 +15,10 @@ const Proyecciones = () => {
   const [formData, setFormData] = useState({
     id: null,
     categoriaId: '',
-    monto: '',
+    subcategoria: '',
     descripcion: '',
+    responsable: 'Andres',
+    monto: '',
   });
 
   const proyeccionesList = proyecciones.filter(p => p.mes === mes);
@@ -26,11 +28,13 @@ const Proyecciones = () => {
       setFormData({
         id: proyeccion.id,
         categoriaId: proyeccion.categoriaId,
+        subcategoria: proyeccion.subcategoria || '',
+        descripcion: proyeccion.descripcion || '',
+        responsable: proyeccion.responsable || 'Andres',
         monto: proyeccion.montoProyectado.toString(),
-        descripcion: proyeccion.descripcion || ''
       });
     } else {
-      setFormData({ id: null, categoriaId: '', monto: '', descripcion: '' });
+      setFormData({ id: null, categoriaId: '', subcategoria: '', descripcion: '', responsable: 'Andres', monto: '' });
     }
     setIsModalOpen(true);
   };
@@ -55,12 +59,14 @@ const Proyecciones = () => {
       if (formData.id) {
         await updateProyeccion(formData.id, {
           categoriaId: formData.categoriaId,
+          subcategoria: formData.subcategoria,
           montoProyectado: Number(formData.monto),
           tipo: cat.tipo,
-          descripcion: formData.descripcion
+          descripcion: formData.descripcion,
+          responsable: formData.responsable
         });
       } else {
-        await saveProyeccion(mes, formData.categoriaId, formData.monto, cat.tipo, formData.descripcion);
+        await saveProyeccion(mes, formData.categoriaId, formData.monto, cat.tipo, formData.descripcion, formData.subcategoria, formData.responsable);
       }
       
       setIsModalOpen(false);
@@ -96,7 +102,7 @@ const Proyecciones = () => {
     } else {
       const promises = snapshot.docs.map(docSnap => {
         const d = docSnap.data();
-        return saveProyeccion(mes, d.categoriaId, d.montoProyectado, d.tipo, d.descripcion || '');
+        return saveProyeccion(mes, d.categoriaId, d.montoProyectado, d.tipo, d.descripcion || '', d.subcategoria || '', d.responsable || 'Andres');
       });
       await Promise.all(promises);
       alert('Proyecciones duplicadas correctamente');
@@ -116,7 +122,8 @@ const Proyecciones = () => {
           <thead className="border-b">
             <tr>
               <th className="h-10 px-2 text-left font-medium text-muted-foreground">Categoría</th>
-              <th className="h-10 px-2 text-left font-medium text-muted-foreground">Descripción</th>
+              <th className="h-10 px-2 text-left font-medium text-muted-foreground">Subcategoría</th>
+              <th className="h-10 px-2 text-left font-medium text-muted-foreground">Responsable</th>
               <th className="h-10 px-2 text-right font-medium text-muted-foreground">Monto Proyectado</th>
               <th className="h-10 px-2 text-right w-10"></th>
             </tr>
@@ -127,8 +134,11 @@ const Proyecciones = () => {
                 <td className="p-2 font-medium">
                   {categorias.find(c => c.id === p.categoriaId)?.icono || '📁'} {categorias.find(c => c.id === p.categoriaId)?.nombre || 'Categoría desconocida'}
                 </td>
-                <td className="p-2 text-muted-foreground italic">
-                  {p.descripcion || '-'}
+                <td className="p-2 font-medium text-indigo-600">
+                  {p.subcategoria || '-'}
+                </td>
+                <td className="p-2 text-sm">
+                  {p.responsable || 'Andres'}
                 </td>
                 <td className="p-2 text-right font-bold">
                   ${(p.montoProyectado || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -246,11 +256,33 @@ const Proyecciones = () => {
             </select>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Descripción (opcional)</label>
+            <label className="text-sm font-medium">Subcategoría</label>
             <input 
               type="text" 
               className="w-full p-2 border rounded-md bg-background" 
-              placeholder="Ej: Ahorro para vacaciones"
+              placeholder="Ej: Visa, Gas, Gym..."
+              value={formData.subcategoria}
+              onChange={(e) => setFormData({...formData, subcategoria: e.target.value})}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Responsable</label>
+            <select 
+              className="w-full p-2 border rounded-md bg-background" 
+              value={formData.responsable}
+              onChange={(e) => setFormData({...formData, responsable: e.target.value})}
+            >
+              <option value="Andres">Andres</option>
+              <option value="Cecilia">Cecilia</option>
+              <option value="Agustin">Agustin</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Descripción (opcional)</label>
+            <input 
+              type="text" 
+              className="w-full p-2 border rounded-md bg-background text-sm" 
+              placeholder="Notas adicionales..."
               value={formData.descripcion}
               onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
             />
