@@ -62,35 +62,68 @@ const Categorias = () => {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {categorias.map((cat) => (
-          <Card key={cat.id} className="overflow-hidden">
-            <div className="h-2 w-full" style={{ backgroundColor: cat.color }}></div>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-lg font-bold">
-                {cat.icono} {cat.nombre}
-              </CardTitle>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm" onClick={() => handleEdit(cat)}><Edit className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDelete(cat.id)}><Trash2 className="h-4 w-4" /></Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <span className={cn(
-                  "px-2 py-0.5 rounded-full text-xs font-medium uppercase",
-                  cat.tipo === 'ingreso' ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-                )}>
-                  {cat.tipo}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {cat.activa ? 'Activa' : 'Inactiva'}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <Card>
+        <CardContent className="p-0">
+          <div className="relative w-full overflow-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/30">
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-12">Icono</th>
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Nombre</th>
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Tipo</th>
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Estado</th>
+                  <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categorias.map((cat) => (
+                  <tr key={cat.id} className="border-b transition-colors hover:bg-muted/50 group">
+                    <td className="p-4 align-middle">
+                      <div 
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-sm border"
+                        style={{ backgroundColor: cat.color + '20', borderColor: cat.color }}
+                      >
+                        {cat.icono || '📁'}
+                      </div>
+                    </td>
+                    <td className="p-4 align-middle font-bold text-base">
+                      {cat.nombre}
+                    </td>
+                    <td className="p-4 align-middle">
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-full text-[10px] font-black uppercase border",
+                        cat.tipo === 'ingreso' 
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                          : "bg-rose-50 text-rose-700 border-rose-200"
+                      )}>
+                        {cat.tipo}
+                      </span>
+                    </td>
+                    <td className="p-4 align-middle">
+                      <span className={cn(
+                        "text-xs font-medium",
+                        cat.activa ? "text-emerald-600" : "text-muted-foreground"
+                      )}>
+                        {cat.activa ? '● Activa' : '○ Inactiva'}
+                      </span>
+                    </td>
+                    <td className="p-4 align-middle text-right">
+                      <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(cat)} className="h-8 w-8 p-0">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-destructive h-8 w-8 p-0" onClick={() => handleDelete(cat.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
       <Modal 
         isOpen={isModalOpen} 

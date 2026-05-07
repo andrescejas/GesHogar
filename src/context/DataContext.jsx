@@ -62,7 +62,7 @@ export const DataProvider = ({ children }) => {
   const deleteMovimiento = useCallback(async (id) => await deleteDoc(doc(db, 'movimientos', id)), []);
 
   // CRUD Proyecciones
-  const saveProyeccion = useCallback(async (mes, categoriaId, monto, tipo) => {
+  const saveProyeccion = useCallback(async (mes, categoriaId, monto, tipo, descripcion = '') => {
     const q = query(collection(db, 'proyecciones'), 
       where('mes', '==', mes), 
       where('categoriaId', '==', categoriaId)
@@ -70,13 +70,17 @@ export const DataProvider = ({ children }) => {
     const snapshot = await getDocs(q);
     
     if (!snapshot.empty) {
-      await updateDoc(doc(db, 'proyecciones', snapshot.docs[0].id), { montoProyectado: Number(monto) });
+      await updateDoc(doc(db, 'proyecciones', snapshot.docs[0].id), { 
+        montoProyectado: Number(monto),
+        descripcion: descripcion
+      });
     } else {
       await addDoc(collection(db, 'proyecciones'), {
         mes,
         categoriaId,
         montoProyectado: Number(monto),
-        tipo
+        tipo,
+        descripcion: descripcion
       });
     }
   }, []);

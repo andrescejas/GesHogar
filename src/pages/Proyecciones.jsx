@@ -17,6 +17,7 @@ const Proyecciones = () => {
     id: null,
     categoriaId: '',
     monto: '',
+    descripcion: '',
   });
 
   const fetchData = useCallback(async () => {
@@ -41,10 +42,11 @@ const Proyecciones = () => {
       setFormData({
         id: proyeccion.id,
         categoriaId: proyeccion.categoriaId,
-        monto: proyeccion.montoProyectado.toString()
+        monto: proyeccion.montoProyectado.toString(),
+        descripcion: proyeccion.descripcion || ''
       });
     } else {
-      setFormData({ id: null, categoriaId: '', monto: '' });
+      setFormData({ id: null, categoriaId: '', monto: '', descripcion: '' });
     }
     setIsModalOpen(true);
   };
@@ -70,10 +72,11 @@ const Proyecciones = () => {
         await updateProyeccion(formData.id, {
           categoriaId: formData.categoriaId,
           montoProyectado: Number(formData.monto),
-          tipo: cat.tipo
+          tipo: cat.tipo,
+          descripcion: formData.descripcion
         });
       } else {
-        await saveProyeccion(mes, formData.categoriaId, formData.monto, cat.tipo);
+        await saveProyeccion(mes, formData.categoriaId, formData.monto, cat.tipo, formData.descripcion);
       }
       
       await fetchData();
@@ -128,6 +131,7 @@ const Proyecciones = () => {
           <thead className="border-b">
             <tr>
               <th className="h-10 px-2 text-left font-medium text-muted-foreground">Categoría</th>
+              <th className="h-10 px-2 text-left font-medium text-muted-foreground">Descripción</th>
               <th className="h-10 px-2 text-right font-medium text-muted-foreground">Monto Proyectado</th>
               <th className="h-10 px-2 text-right w-10"></th>
             </tr>
@@ -137,6 +141,9 @@ const Proyecciones = () => {
               <tr key={p.id} className="border-b hover:bg-muted/50 transition-colors">
                 <td className="p-2 font-medium">
                   {categorias.find(c => c.id === p.categoriaId)?.icono || '📁'} {categorias.find(c => c.id === p.categoriaId)?.nombre || 'Categoría desconocida'}
+                </td>
+                <td className="p-2 text-muted-foreground italic">
+                  {p.descripcion || '-'}
                 </td>
                 <td className="p-2 text-right font-bold">
                   ${(p.montoProyectado || 0).toLocaleString()}
@@ -153,7 +160,7 @@ const Proyecciones = () => {
             ))}
             {list.length === 0 && (
               <tr>
-                <td colSpan="3" className="p-4 text-center text-muted-foreground italic">Sin proyecciones</td>
+                <td colSpan="4" className="p-4 text-center text-muted-foreground italic">Sin proyecciones</td>
               </tr>
             )}
           </tbody>
@@ -252,6 +259,16 @@ const Proyecciones = () => {
                 <option key={c.id} value={c.id}>{c.icono} {c.nombre} ({c.tipo})</option>
               ))}
             </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Descripción (opcional)</label>
+            <input 
+              type="text" 
+              className="w-full p-2 border rounded-md bg-background" 
+              placeholder="Ej: Ahorro para vacaciones"
+              value={formData.descripcion}
+              onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
+            />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Monto Proyectado</label>
