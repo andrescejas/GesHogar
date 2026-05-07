@@ -21,9 +21,15 @@ const Proyecciones = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const data = await loadProyecciones(mes);
-    setProyeccionesList(data);
-    setLoading(false);
+    try {
+      const data = await loadProyecciones(mes);
+      setProyeccionesList(data);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      alert("Error al cargar datos: " + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -45,11 +51,17 @@ const Proyecciones = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!formData.categoriaId || !formData.monto) {
+      alert('Por favor, selecciona una categoría y un monto válido.');
+      return;
+    }
+
     setLoading(true);
     try {
       const cat = categorias.find(c => c.id === formData.categoriaId);
       if (!cat) {
-        alert('Por favor selecciona una categoría válida');
+        alert('Categoría no encontrada');
         setLoading(false);
         return;
       }
@@ -67,9 +79,10 @@ const Proyecciones = () => {
       await fetchData();
       setIsModalOpen(false);
       setFormData({ id: null, categoriaId: '', monto: '' });
+      alert('Proyección guardada correctamente');
     } catch (error) {
-      console.error("Error al guardar proyección:", error);
-      alert('Error al guardar la proyección: ' + error.message);
+      console.error("Error al guardar:", error);
+      alert('Error al guardar: ' + error.message);
     } finally {
       setLoading(false);
     }
