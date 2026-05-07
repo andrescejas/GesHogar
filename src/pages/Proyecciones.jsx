@@ -19,7 +19,7 @@ const Proyecciones = () => {
     monto: '',
   });
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const data = await loadProyecciones(mes);
@@ -30,11 +30,11 @@ const Proyecciones = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [mes, loadProyecciones]);
 
   useEffect(() => {
     fetchData();
-  }, [mes, loadProyecciones]);
+  }, [fetchData]);
 
   const handleOpenModal = (proyeccion = null) => {
     if (proyeccion) {

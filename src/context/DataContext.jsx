@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { db } from '../lib/firebase';
 import { 
   collection, 
@@ -43,26 +43,26 @@ export const DataProvider = ({ children }) => {
   }, []);
 
   // Función para cargar proyecciones de un mes específico (bajo demanda para evitar sobrecarga)
-  const loadProyecciones = async (mes) => {
+  const loadProyecciones = useCallback(async (mes) => {
     const q = query(collection(db, 'proyecciones'), where('mes', '==', mes));
     const snapshot = await getDocs(q);
     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     setProyecciones(data);
     return data;
-  };
+  }, []);
 
   // CRUD Categorías
-  const addCategoria = async (nueva) => await addDoc(collection(db, 'categorias'), nueva);
-  const updateCategoria = async (id, datos) => await updateDoc(doc(db, 'categorias', id), datos);
-  const deleteCategoria = async (id) => await deleteDoc(doc(db, 'categorias', id));
+  const addCategoria = useCallback(async (nueva) => await addDoc(collection(db, 'categorias'), nueva), []);
+  const updateCategoria = useCallback(async (id, datos) => await updateDoc(doc(db, 'categorias', id), datos), []);
+  const deleteCategoria = useCallback(async (id) => await deleteDoc(doc(db, 'categorias', id)), []);
 
   // CRUD Movimientos
-  const addMovimiento = async (nuevo) => await addDoc(collection(db, 'movimientos'), nuevo);
-  const updateMovimiento = async (id, datos) => await updateDoc(doc(db, 'movimientos', id), datos);
-  const deleteMovimiento = async (id) => await deleteDoc(doc(db, 'movimientos', id));
+  const addMovimiento = useCallback(async (nuevo) => await addDoc(collection(db, 'movimientos'), nuevo), []);
+  const updateMovimiento = useCallback(async (id, datos) => await updateDoc(doc(db, 'movimientos', id), datos), []);
+  const deleteMovimiento = useCallback(async (id) => await deleteDoc(doc(db, 'movimientos', id)), []);
 
   // CRUD Proyecciones
-  const saveProyeccion = async (mes, categoriaId, monto, tipo) => {
+  const saveProyeccion = useCallback(async (mes, categoriaId, monto, tipo) => {
     const q = query(collection(db, 'proyecciones'), 
       where('mes', '==', mes), 
       where('categoriaId', '==', categoriaId)
@@ -79,12 +79,12 @@ export const DataProvider = ({ children }) => {
         tipo
       });
     }
-  };
+  }, []);
 
-  const updateProyeccion = async (id, datos) => {
+  const updateProyeccion = useCallback(async (id, datos) => {
     if (datos.montoProyectado) datos.montoProyectado = Number(datos.montoProyectado);
     await updateDoc(doc(db, 'proyecciones', id), datos);
-  };
+  }, []);
 
   return (
     <DataContext.Provider value={{ 
