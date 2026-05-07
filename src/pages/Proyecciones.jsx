@@ -8,12 +8,13 @@ import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 
 const Proyecciones = () => {
-  const { categorias, loadProyecciones, saveProyeccion } = useData();
+  const { categorias, loadProyecciones, saveProyeccion, updateProyeccion } = useData();
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
   const [proyeccionesList, setProyeccionesList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
+    id: null,
     categoriaId: '',
     monto: '',
   });
@@ -29,8 +30,16 @@ const Proyecciones = () => {
     fetchData();
   }, [mes, loadProyecciones]);
 
-  const handleOpenModal = () => {
-    setFormData({ categoriaId: '', monto: '' });
+  const handleOpenModal = (proyeccion = null) => {
+    if (proyeccion) {
+      setFormData({
+        id: proyeccion.id,
+        categoriaId: proyeccion.categoriaId,
+        monto: proyeccion.montoProyectado.toString()
+      });
+    } else {
+      setFormData({ id: null, categoriaId: '', monto: '' });
+    }
     setIsModalOpen(true);
   };
 
@@ -39,7 +48,15 @@ const Proyecciones = () => {
     setLoading(true);
     const cat = categorias.find(c => c.id === formData.categoriaId);
     if (cat) {
-      await saveProyeccion(mes, formData.categoriaId, formData.monto, cat.tipo);
+      if (formData.id) {
+        await updateProyeccion(formData.id, {
+          categoriaId: formData.categoriaId,
+          montoProyectado: formData.monto,
+          tipo: cat.tipo
+        });
+      } else {
+        await saveProyeccion(mes, formData.categoriaId, formData.monto, cat.tipo);
+      }
       await fetchData();
       setIsModalOpen(false);
     }
@@ -95,7 +112,10 @@ const Proyecciones = () => {
               <tr key={p.id} className="border-b hover:bg-muted/50 transition-colors">
                 <td className="p-2 font-medium">{categorias.find(c => c.id === p.categoriaId)?.icono} {categorias.find(c => c.id === p.categoriaId)?.nombre}</td>
                 <td className="p-2 text-right font-bold">${p.montoProyectado.toLocaleString()}</td>
-                <td className="p-2 text-right">
+                <td className="p-2 text-right flex justify-end gap-1">
+                  <Button variant="ghost" size="sm" className="text-indigo-600 h-7 w-7 p-0" onClick={() => handleOpenModal(p)}>
+                    <Edit className="h-3.5 w-3.5" />
+                  </Button>
                   <Button variant="ghost" size="sm" className="text-destructive h-7 w-7 p-0" onClick={() => handleDelete(p.id)}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -130,7 +150,7 @@ const Proyecciones = () => {
           <Button variant="outline" size="sm" onClick={duplicarMesAnterior} disabled={loading}>
             <Copy className="mr-2 h-4 w-4" /> Duplicar Anterior
           </Button>
-          <Button size="sm" onClick={handleOpenModal}>
+          <Button size="sm" onClick={() => handleOpenModal()}>
             <Plus className="mr-2 h-4 w-4" /> Nueva Proyección
           </Button>
         </div>
@@ -182,7 +202,11 @@ const Proyecciones = () => {
         </CardContent>
       </Card>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Agregar Proyección">
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        title={formData.id ? "Editar Proyección" : "Agregar Proyección"}
+      >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Categoría</label>
@@ -211,7 +235,9 @@ const Proyecciones = () => {
           </div>
           <div className="flex justify-end gap-3 pt-4">
             <Button variant="outline" type="button" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
-            <Button type="submit" disabled={loading}>Guardar Proyección</Button>
+            <Button type="submit" disabled={loading}>
+              {formData.id ? "Actualizar Proyección" : "Guardar Proyección"}
+            </Button>
           </div>
         </form>
       </Modal>

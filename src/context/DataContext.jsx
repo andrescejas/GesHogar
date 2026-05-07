@@ -81,6 +81,11 @@ export const DataProvider = ({ children }) => {
     }
   };
 
+  const updateProyeccion = async (id, datos) => {
+    if (datos.montoProyectado) datos.montoProyectado = Number(datos.montoProyectado);
+    await updateDoc(doc(db, 'proyecciones', id), datos);
+  };
+
   return (
     <DataContext.Provider value={{ 
       categorias, 
@@ -94,7 +99,8 @@ export const DataProvider = ({ children }) => {
       addMovimiento,
       updateMovimiento,
       deleteMovimiento,
-      saveProyeccion
+      saveProyeccion,
+      updateProyeccion
     }}>
       {children}
     </DataContext.Provider>
