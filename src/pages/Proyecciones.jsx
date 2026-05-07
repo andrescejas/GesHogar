@@ -18,16 +18,16 @@ const Proyecciones = () => {
     monto: '',
   });
 
-  useEffect(() => {
-    fetchData();
-  }, [mes]);
-
   const fetchData = async () => {
     setLoading(true);
     const data = await loadProyecciones(mes);
     setProyeccionesList(data);
     setLoading(false);
   };
+
+  useEffect(() => {
+    fetchData();
+  }, [mes, loadProyecciones]);
 
   const handleOpenModal = () => {
     setFormData({ categoriaId: '', monto: '' });
