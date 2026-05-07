@@ -29,7 +29,7 @@ const Comparativo = () => {
     
     // Sumar movimientos reales del mes
     const real = movimientos
-      .filter(m => m.categoria === cat.nombre && m.fecha.startsWith(mes))
+      .filter(m => (m.categoriaId === cat.id || m.categoria === cat.nombre) && m.fecha.startsWith(mes))
       .reduce((acc, m) => acc + Number(m.monto), 0);
     
     // Diferencia: 

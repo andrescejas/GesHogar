@@ -47,7 +47,7 @@ const Dashboard = () => {
       .filter(c => c.tipo === 'egreso')
       .map(cat => ({
         name: cat.nombre,
-        value: movs.filter(m => m.categoria === cat.nombre).reduce((acc, m) => acc + Number(m.monto), 0),
+        value: movs.filter(m => m.categoriaId === cat.id || m.categoria === cat.nombre).reduce((acc, m) => acc + Number(m.monto), 0),
         color: cat.color || '#cbd5e1'
       }))
       .filter(d => d.value > 0);

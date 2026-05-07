@@ -14,7 +14,7 @@ const Movimientos = () => {
   const [formData, setFormData] = useState({
     fecha: new Date().toISOString().split('T')[0],
     tipo: 'egreso',
-    categoria: '',
+    categoriaId: '',
     descripcion: '',
     monto: '',
     responsable: '',
@@ -42,7 +42,7 @@ const Movimientos = () => {
     setFormData({
       fecha: m.fecha,
       tipo: m.tipo,
-      categoria: m.categoria,
+      categoriaId: m.categoriaId || '',
       descripcion: m.descripcion,
       monto: m.monto,
       responsable: m.responsable,
@@ -63,7 +63,7 @@ const Movimientos = () => {
     setFormData({
       fecha: new Date().toISOString().split('T')[0],
       tipo: 'egreso',
-      categoria: '',
+      categoriaId: '',
       descripcion: '',
       monto: '',
       responsable: '',
@@ -133,7 +133,9 @@ const Movimientos = () => {
                         {m.tipo}
                       </span>
                     </td>
-                    <td className="p-4 align-middle">{m.categoria}</td>
+                    <td className="p-4 align-middle">
+                      {categorias.find(c => c.id === m.categoriaId)?.icono} {categorias.find(c => c.id === m.categoriaId)?.nombre || 'Sin categoría'}
+                    </td>
                     <td className="p-4 align-middle">{m.descripcion}</td>
                     <td className="p-4 align-middle">{m.responsable}</td>
                     <td className="p-4 align-middle text-right font-medium">
@@ -185,11 +187,19 @@ const Movimientos = () => {
           
           <div className="space-y-2">
             <label className="text-sm font-medium">Categoría</label>
-            <select className="w-full p-2 border rounded-md bg-background" required value={formData.categoria} onChange={(e) => setFormData({...formData, categoria: e.target.value})}>
+            <select 
+              className="w-full p-2 border rounded-md bg-background" 
+              required 
+              value={formData.categoriaId} 
+              onChange={(e) => setFormData({...formData, categoriaId: e.target.value})}
+            >
               <option value="">Seleccionar categoría...</option>
-              {categorias.filter(c => c.tipo === formData.tipo).map(c => (
-                <option key={c.id} value={c.nombre}>{c.icono} {c.nombre}</option>
-              ))}
+              {categorias
+                .filter(c => c.tipo.toLowerCase() === formData.tipo.toLowerCase())
+                .map(c => (
+                  <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
+                ))
+              }
             </select>
           </div>
 
