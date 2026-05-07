@@ -7,25 +7,15 @@ import { cn } from '../lib/utils';
 import { ArrowUpRight, ArrowDownRight, Minus, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 const Comparativo = () => {
-  const { categorias, movimientos, loadProyecciones } = useData();
+  const { categorias, movimientos, proyecciones } = useData();
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
-  const [proyecciones, setProyecciones] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      const data = await loadProyecciones(mes);
-      setProyecciones(data);
-      setLoading(false);
-    };
-    fetchData();
-  }, [mes, movimientos]); // Recargar si cambia el mes o los movimientos
 
   // Consolidar datos comparativos siguiendo el nuevo modelo
   const comparativa = categorias.map(cat => {
-    // Buscar el monto en la entidad separada de proyecciones
-    const proyectado = proyecciones.find(p => p.categoriaId === cat.id)?.montoProyectado || 0;
+    // Buscar y sumar todos los ítems proyectados de esta categoría en el mes
+    const proyectado = proyecciones
+      .filter(p => p.categoriaId === cat.id && p.mes === mes)
+      .reduce((acc, p) => acc + (Number(p.montoProyectado) || 0), 0);
     
     // Sumar movimientos reales del mes
     const real = movimientos
@@ -71,7 +61,7 @@ const Comparativo = () => {
         />
       </div>
 
-      {loading ? (
+      {false ? (
         <div className="flex items-center justify-center h-64 text-muted-foreground">
           <Loader2 className="h-8 w-8 animate-spin mr-2" />
           Calculando comparativa...

@@ -17,6 +17,7 @@ const DataContext = createContext();
 
 export const DataProvider = ({ children }) => {
   const [categorias, setCategorias] = useState([]);
+  const [subcategorias, setSubcategorias] = useState([]);
   const [movimientos, setMovimientos] = useState([]);
   const [proyecciones, setProyecciones] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -52,10 +53,25 @@ export const DataProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
+  // Escuchar subcategorías en tiempo real
+  useEffect(() => {
+    const q = query(collection(db, 'subcategorias'), orderBy('nombre'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setSubcategorias(data);
+    }, (error) => console.error("Error Subcategorías:", error));
+    return () => unsubscribe();
+  }, []);
+
   // CRUD Categorías
   const addCategoria = useCallback(async (nueva) => await addDoc(collection(db, 'categorias'), nueva), []);
   const updateCategoria = useCallback(async (id, datos) => await updateDoc(doc(db, 'categorias', id), datos), []);
   const deleteCategoria = useCallback(async (id) => await deleteDoc(doc(db, 'categorias', id)), []);
+
+  // CRUD Subcategorías
+  const addSubcategoria = useCallback(async (nueva) => await addDoc(collection(db, 'subcategorias'), nueva), []);
+  const updateSubcategoria = useCallback(async (id, datos) => await updateDoc(doc(db, 'subcategorias', id), datos), []);
+  const deleteSubcategoria = useCallback(async (id) => await deleteDoc(doc(db, 'subcategorias', id)), []);
 
   // CRUD Movimientos
   const addMovimiento = useCallback(async (nuevo) => await addDoc(collection(db, 'movimientos'), nuevo), []);
@@ -83,12 +99,16 @@ export const DataProvider = ({ children }) => {
   return (
     <DataContext.Provider value={{ 
       categorias, 
+      subcategorias,
       movimientos, 
       proyecciones,
       loading,
       addCategoria, 
       updateCategoria,
       deleteCategoria,
+      addSubcategoria,
+      updateSubcategoria,
+      deleteSubcategoria,
       addMovimiento,
       updateMovimiento,
       deleteMovimiento,

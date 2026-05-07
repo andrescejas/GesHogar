@@ -7,7 +7,7 @@ import { useData } from '../context/DataContext';
 import { cn } from '../lib/utils';
 
 const Movimientos = () => {
-  const { movimientos, categorias, addMovimiento, updateMovimiento, deleteMovimiento, loading } = useData();
+  const { movimientos, categorias, subcategorias, addMovimiento, updateMovimiento, deleteMovimiento, loading } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -15,10 +15,10 @@ const Movimientos = () => {
     fecha: new Date().toISOString().split('T')[0],
     tipo: 'egreso',
     categoriaId: '',
-    subcategoria: '',
+    subcategoriaId: '',
     descripcion: '',
     monto: '',
-    responsable: 'Andres',
+    responsable: '',
     estado: 'pagado'
   });
 
@@ -44,10 +44,10 @@ const Movimientos = () => {
       fecha: m.fecha,
       tipo: m.tipo,
       categoriaId: m.categoriaId || '',
-      subcategoria: m.subcategoria || '',
+      subcategoriaId: m.subcategoriaId || '',
       descripcion: m.descripcion || '',
       monto: m.monto,
-      responsable: m.responsable || 'Andres',
+      responsable: m.responsable || '',
       estado: m.estado
     });
     setIsModalOpen(true);
@@ -66,10 +66,10 @@ const Movimientos = () => {
       fecha: new Date().toISOString().split('T')[0],
       tipo: 'egreso',
       categoriaId: '',
-      subcategoria: '',
+      subcategoriaId: '',
       descripcion: '',
       monto: '',
-      responsable: 'Andres',
+      responsable: '',
       estado: 'pagado'
     });
   };
@@ -140,9 +140,11 @@ const Movimientos = () => {
                     <td className="p-4 align-middle">
                       {categorias.find(c => c.id === m.categoriaId)?.icono} {categorias.find(c => c.id === m.categoriaId)?.nombre || 'Sin categoría'}
                     </td>
-                    <td className="p-4 align-middle">{m.subcategoria}</td>
+                    <td className="p-4 align-middle">
+                      {subcategorias.find(s => s.id === m.subcategoriaId)?.nombre || '-'}
+                    </td>
                     <td className="p-4 align-middle">{m.descripcion}</td>
-                    <td className="p-4 align-middle font-medium">{m.responsable}</td>
+                    <td className="p-4 align-middle font-medium">{m.responsable || 'Sin asignar'}</td>
                     <td className="p-4 align-middle text-right font-medium">
                       {m.tipo === 'ingreso' ? '+' : '-'}${Number(m.monto).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
@@ -210,13 +212,20 @@ const Movimientos = () => {
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Subcategoría</label>
-            <input 
-              type="text" 
+            <select 
               className="w-full p-2 border rounded-md bg-background" 
-              placeholder="Ej: Visa, Patente, Gym..."
-              value={formData.subcategoria} 
-              onChange={(e) => setFormData({...formData, subcategoria: e.target.value})} 
-            />
+              value={formData.subcategoriaId} 
+              onChange={(e) => setFormData({...formData, subcategoriaId: e.target.value})}
+              disabled={!formData.categoriaId}
+            >
+              <option value="">Seleccionar subcategoría...</option>
+              {subcategorias
+                .filter(s => s.categoriaId === formData.categoriaId)
+                .map(s => (
+                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                ))
+              }
+            </select>
           </div>
 
           <div className="space-y-2">
@@ -233,10 +242,10 @@ const Movimientos = () => {
               <label className="text-sm font-medium">Responsable</label>
               <select 
                 className="w-full p-2 border rounded-md bg-background" 
-                required 
                 value={formData.responsable} 
                 onChange={(e) => setFormData({...formData, responsable: e.target.value})}
               >
+                <option value="">Sin asignar</option>
                 <option value="Andres">Andres</option>
                 <option value="Cecilia">Cecilia</option>
                 <option value="Agustin">Agustin</option>

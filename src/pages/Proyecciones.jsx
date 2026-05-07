@@ -8,16 +8,16 @@ import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 
 const Proyecciones = () => {
-  const { categorias, proyecciones, saveProyeccion, updateProyeccion, loading: contextLoading } = useData();
+  const { categorias, subcategorias, proyecciones, saveProyeccion, updateProyeccion, loading: contextLoading } = useData();
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     id: null,
     categoriaId: '',
-    subcategoria: '',
+    subcategoriaId: '',
     descripcion: '',
-    responsable: 'Andres',
+    responsable: '',
     monto: '',
   });
 
@@ -28,13 +28,13 @@ const Proyecciones = () => {
       setFormData({
         id: proyeccion.id,
         categoriaId: proyeccion.categoriaId,
-        subcategoria: proyeccion.subcategoria || '',
+        subcategoriaId: proyeccion.subcategoriaId || '',
         descripcion: proyeccion.descripcion || '',
-        responsable: proyeccion.responsable || 'Andres',
+        responsable: proyeccion.responsable || '',
         monto: proyeccion.montoProyectado.toString(),
       });
     } else {
-      setFormData({ id: null, categoriaId: '', subcategoria: '', descripcion: '', responsable: 'Andres', monto: '' });
+      setFormData({ id: null, categoriaId: '', subcategoriaId: '', descripcion: '', responsable: '', monto: '' });
     }
     setIsModalOpen(true);
   };
@@ -59,14 +59,14 @@ const Proyecciones = () => {
       if (formData.id) {
         await updateProyeccion(formData.id, {
           categoriaId: formData.categoriaId,
-          subcategoria: formData.subcategoria,
+          subcategoriaId: formData.subcategoriaId,
           montoProyectado: Number(formData.monto),
           tipo: cat.tipo,
           descripcion: formData.descripcion,
           responsable: formData.responsable
         });
       } else {
-        await saveProyeccion(mes, formData.categoriaId, formData.monto, cat.tipo, formData.descripcion, formData.subcategoria, formData.responsable);
+        await saveProyeccion(mes, formData.categoriaId, formData.monto, cat.tipo, formData.descripcion, formData.subcategoriaId, formData.responsable);
       }
       
       setIsModalOpen(false);
@@ -102,7 +102,7 @@ const Proyecciones = () => {
     } else {
       const promises = snapshot.docs.map(docSnap => {
         const d = docSnap.data();
-        return saveProyeccion(mes, d.categoriaId, d.montoProyectado, d.tipo, d.descripcion || '', d.subcategoria || '', d.responsable || 'Andres');
+        return saveProyeccion(mes, d.categoriaId, d.montoProyectado, d.tipo, d.descripcion || '', d.subcategoriaId || '', d.responsable || '');
       });
       await Promise.all(promises);
       alert('Proyecciones duplicadas correctamente');
@@ -135,10 +135,10 @@ const Proyecciones = () => {
                   {categorias.find(c => c.id === p.categoriaId)?.icono || '📁'} {categorias.find(c => c.id === p.categoriaId)?.nombre || 'Categoría desconocida'}
                 </td>
                 <td className="p-2 font-medium text-indigo-600">
-                  {p.subcategoria || '-'}
+                  {subcategorias.find(s => s.id === p.subcategoriaId)?.nombre || '-'}
                 </td>
                 <td className="p-2 text-sm">
-                  {p.responsable || 'Andres'}
+                  {p.responsable || 'Sin asignar'}
                 </td>
                 <td className="p-2 text-right font-bold">
                   ${(p.montoProyectado || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -257,13 +257,20 @@ const Proyecciones = () => {
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Subcategoría</label>
-            <input 
-              type="text" 
+            <select 
               className="w-full p-2 border rounded-md bg-background" 
-              placeholder="Ej: Visa, Gas, Gym..."
-              value={formData.subcategoria}
-              onChange={(e) => setFormData({...formData, subcategoria: e.target.value})}
-            />
+              value={formData.subcategoriaId} 
+              onChange={(e) => setFormData({...formData, subcategoriaId: e.target.value})}
+              disabled={!formData.categoriaId}
+            >
+              <option value="">Seleccionar subcategoría...</option>
+              {subcategorias
+                .filter(s => s.categoriaId === formData.categoriaId)
+                .map(s => (
+                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                ))
+              }
+            </select>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Responsable</label>
@@ -272,6 +279,7 @@ const Proyecciones = () => {
               value={formData.responsable}
               onChange={(e) => setFormData({...formData, responsable: e.target.value})}
             >
+              <option value="">Sin asignar</option>
               <option value="Andres">Andres</option>
               <option value="Cecilia">Cecilia</option>
               <option value="Agustin">Agustin</option>
