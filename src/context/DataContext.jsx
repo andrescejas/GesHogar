@@ -79,14 +79,14 @@ export const DataProvider = ({ children }) => {
   const deleteMovimiento = useCallback(async (id) => await deleteDoc(doc(db, 'movimientos', id)), []);
 
   // CRUD Proyecciones
-  const saveProyeccion = useCallback(async (mes, categoriaId, monto, tipo, descripcion = '', subcategoria = '', responsable = 'Andres') => {
+  const saveProyeccion = useCallback(async (mes, categoriaId, monto, tipo, descripcion = '', subcategoriaId = '', responsable = '') => {
     await addDoc(collection(db, 'proyecciones'), {
       mes,
       categoriaId,
       montoProyectado: Number(monto),
       tipo,
       descripcion,
-      subcategoria,
+      subcategoriaId,
       responsable
     });
   }, []);

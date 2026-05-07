@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Copy, Save, Loader2, Plus, Trash2, Edit } from 'lucide-react';
+import { Copy, Save, Loader2, Plus, Trash2, Edit, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
@@ -10,6 +10,7 @@ import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/fire
 const Proyecciones = () => {
   const { categorias, subcategorias, proyecciones, saveProyeccion, updateProyeccion, loading: contextLoading } = useData();
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -102,7 +103,9 @@ const Proyecciones = () => {
     } else {
       const promises = snapshot.docs.map(docSnap => {
         const d = docSnap.data();
-        return saveProyeccion(mes, d.categoriaId, d.montoProyectado, d.tipo, d.descripcion || '', d.subcategoriaId || '', d.responsable || '');
+        // Fallback para registros creados durante la transición de nombres de campos
+        const subId = d.subcategoriaId || d.subcategoria || '';
+        return saveProyeccion(mes, d.categoriaId, d.montoProyectado, d.tipo, d.descripcion || '', subId, d.responsable || '');
       });
       await Promise.all(promises);
       alert('Proyecciones duplicadas correctamente');
@@ -112,6 +115,15 @@ const Proyecciones = () => {
 
   const renderTable = (tipo) => {
     const list = proyeccionesList.filter(p => {
+      // Búsqueda
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = !searchTerm || 
+        (p.descripcion && p.descripcion.toLowerCase().includes(searchLower)) ||
+        (categorias.find(c => c.id === p.categoriaId)?.nombre.toLowerCase().includes(searchLower)) ||
+        (subcategorias.find(s => s.id === p.subcategoriaId)?.nombre.toLowerCase().includes(searchLower));
+
+      if (!matchesSearch) return false;
+
       if (p.tipo) return p.tipo === tipo;
       const cat = categorias.find(c => c.id === p.categoriaId);
       return cat?.tipo === tipo;
@@ -124,6 +136,7 @@ const Proyecciones = () => {
               <th className="h-10 px-2 text-left font-medium text-muted-foreground">Categoría</th>
               <th className="h-10 px-2 text-left font-medium text-muted-foreground">Subcategoría</th>
               <th className="h-10 px-2 text-left font-medium text-muted-foreground">Responsable</th>
+              <th className="h-10 px-2 text-left font-medium text-muted-foreground">Descripción</th>
               <th className="h-10 px-2 text-right font-medium text-muted-foreground">Monto Proyectado</th>
               <th className="h-10 px-2 text-right w-10"></th>
             </tr>
@@ -140,6 +153,9 @@ const Proyecciones = () => {
                 <td className="p-2 text-sm">
                   {p.responsable || 'Sin asignar'}
                 </td>
+                <td className="p-2 text-sm text-muted-foreground truncate max-w-[150px]" title={p.descripcion}>
+                  {p.descripcion || '-'}
+                </td>
                 <td className="p-2 text-right font-bold">
                   ${(p.montoProyectado || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
@@ -155,7 +171,7 @@ const Proyecciones = () => {
             ))}
             {list.length === 0 && (
               <tr>
-                <td colSpan="4" className="p-4 text-center text-muted-foreground italic">Sin proyecciones</td>
+                <td colSpan="6" className="p-4 text-center text-muted-foreground italic">Sin proyecciones</td>
               </tr>
             )}
           </tbody>
@@ -172,6 +188,16 @@ const Proyecciones = () => {
           <p className="text-muted-foreground">Gestiona tus proyecciones como registros individuales.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Buscar..."
+              className="pl-9 pr-4 py-2 text-sm border rounded-md bg-background w-[150px] md:w-[200px]"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
           <input 
             type="month" 
             className="p-2 border rounded-md bg-background text-sm font-medium"
