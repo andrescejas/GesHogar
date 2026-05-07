@@ -26,8 +26,13 @@ const Dashboard = () => {
     const movs = movimientos.filter(m => m.fecha.startsWith(mes));
     const proys = proyecciones.filter(p => p.mes === mes);
 
-    const ingresosReales = movs.filter(m => m.tipo === 'ingreso').reduce((acc, m) => acc + Number(m.monto), 0);
-    const egresosReales = movs.filter(m => m.tipo === 'egreso').reduce((acc, m) => acc + Number(m.monto), 0);
+    const ingresosReales = movs
+      .filter(m => m.tipo === 'ingreso' && m.estado !== 'proyectado')
+      .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
+      
+    const egresosReales = movs
+      .filter(m => m.tipo === 'egreso' && m.estado !== 'proyectado')
+      .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
     
     const ingresosProyectados = proys.filter(p => p.tipo === 'ingreso').reduce((acc, p) => acc + p.montoProyectado, 0);
     const egresosProyectados = proys.filter(p => p.tipo === 'egreso').reduce((acc, p) => acc + p.montoProyectado, 0);

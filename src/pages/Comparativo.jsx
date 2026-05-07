@@ -29,8 +29,8 @@ const Comparativo = () => {
     
     // Sumar movimientos reales del mes
     const real = movimientos
-      .filter(m => (m.categoriaId === cat.id || m.categoria === cat.nombre) && m.fecha.startsWith(mes))
-      .reduce((acc, m) => acc + Number(m.monto), 0);
+      .filter(m => (m.categoriaId === cat.id || m.categoria === cat.nombre) && m.fecha.startsWith(mes) && m.estado !== 'proyectado')
+      .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
     
     // Diferencia: 
     // En INGRESOS: real - proyectado (positivo es bueno)
