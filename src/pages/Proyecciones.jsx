@@ -8,9 +8,8 @@ import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 
 const Proyecciones = () => {
-  const { categorias, loadProyecciones, saveProyeccion, updateProyeccion } = useData();
+  const { categorias, proyecciones, saveProyeccion, updateProyeccion, loading: contextLoading } = useData();
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
-  const [proyeccionesList, setProyeccionesList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -20,22 +19,7 @@ const Proyecciones = () => {
     descripcion: '',
   });
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await loadProyecciones(mes);
-      setProyeccionesList(data);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      alert("Error al cargar datos: " + error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [mes, loadProyecciones]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const proyeccionesList = proyecciones.filter(p => p.mes === mes);
 
   const handleOpenModal = (proyeccion = null) => {
     if (proyeccion) {
@@ -79,9 +63,8 @@ const Proyecciones = () => {
         await saveProyeccion(mes, formData.categoriaId, formData.monto, cat.tipo, formData.descripcion);
       }
       
-      await fetchData();
       setIsModalOpen(false);
-      setFormData({ id: null, categoriaId: '', monto: '' });
+      setFormData({ id: null, categoriaId: '', monto: '', descripcion: '' });
       alert('Proyección guardada correctamente');
     } catch (error) {
       console.error("Error al guardar:", error);
@@ -95,7 +78,6 @@ const Proyecciones = () => {
     if (window.confirm('¿Eliminar esta proyección?')) {
       setLoading(true);
       await deleteDoc(doc(db, 'proyecciones', id));
-      await fetchData();
       setLoading(false);
     }
   };
@@ -114,17 +96,20 @@ const Proyecciones = () => {
     } else {
       const promises = snapshot.docs.map(docSnap => {
         const d = docSnap.data();
-        return saveProyeccion(mes, d.categoriaId, d.montoProyectado, d.tipo);
+        return saveProyeccion(mes, d.categoriaId, d.montoProyectado, d.tipo, d.descripcion || '');
       });
       await Promise.all(promises);
-      await fetchData();
       alert('Proyecciones duplicadas correctamente');
     }
     setLoading(false);
   };
 
   const renderTable = (tipo) => {
-    const list = proyeccionesList.filter(p => p.tipo === tipo);
+    const list = proyeccionesList.filter(p => {
+      if (p.tipo) return p.tipo === tipo;
+      const cat = categorias.find(c => c.id === p.categoriaId);
+      return cat?.tipo === tipo;
+    });
     return (
       <div className="relative w-full overflow-auto mt-4">
         <table className="w-full text-sm">

@@ -42,13 +42,14 @@ export const DataProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  // Función para cargar proyecciones de un mes específico (bajo demanda para evitar sobrecarga)
-  const loadProyecciones = useCallback(async (mes) => {
-    const q = query(collection(db, 'proyecciones'), where('mes', '==', mes));
-    const snapshot = await getDocs(q);
-    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    setProyecciones(data);
-    return data;
+  // Escuchar proyecciones en tiempo real
+  useEffect(() => {
+    const q = query(collection(db, 'proyecciones'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setProyecciones(data);
+    }, (error) => console.error("Error Proyecciones:", error));
+    return () => unsubscribe();
   }, []);
 
   // CRUD Categorías
@@ -63,26 +64,13 @@ export const DataProvider = ({ children }) => {
 
   // CRUD Proyecciones
   const saveProyeccion = useCallback(async (mes, categoriaId, monto, tipo, descripcion = '') => {
-    const q = query(collection(db, 'proyecciones'), 
-      where('mes', '==', mes), 
-      where('categoriaId', '==', categoriaId)
-    );
-    const snapshot = await getDocs(q);
-    
-    if (!snapshot.empty) {
-      await updateDoc(doc(db, 'proyecciones', snapshot.docs[0].id), { 
-        montoProyectado: Number(monto),
-        descripcion: descripcion
-      });
-    } else {
-      await addDoc(collection(db, 'proyecciones'), {
-        mes,
-        categoriaId,
-        montoProyectado: Number(monto),
-        tipo,
-        descripcion: descripcion
-      });
-    }
+    await addDoc(collection(db, 'proyecciones'), {
+      mes,
+      categoriaId,
+      montoProyectado: Number(monto),
+      tipo,
+      descripcion: descripcion
+    });
   }, []);
 
   const updateProyeccion = useCallback(async (id, datos) => {
@@ -96,7 +84,6 @@ export const DataProvider = ({ children }) => {
       movimientos, 
       proyecciones,
       loading,
-      loadProyecciones,
       addCategoria, 
       updateCategoria,
       deleteCategoria,
