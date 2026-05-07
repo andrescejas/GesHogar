@@ -46,21 +46,33 @@ const Proyecciones = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const cat = categorias.find(c => c.id === formData.categoriaId);
-    if (cat) {
+    try {
+      const cat = categorias.find(c => c.id === formData.categoriaId);
+      if (!cat) {
+        alert('Por favor selecciona una categoría válida');
+        setLoading(false);
+        return;
+      }
+
       if (formData.id) {
         await updateProyeccion(formData.id, {
           categoriaId: formData.categoriaId,
-          montoProyectado: formData.monto,
+          montoProyectado: Number(formData.monto),
           tipo: cat.tipo
         });
       } else {
         await saveProyeccion(mes, formData.categoriaId, formData.monto, cat.tipo);
       }
+      
       await fetchData();
       setIsModalOpen(false);
+      setFormData({ id: null, categoriaId: '', monto: '' });
+    } catch (error) {
+      console.error("Error al guardar proyección:", error);
+      alert('Error al guardar la proyección: ' + error.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleDelete = async (id) => {
