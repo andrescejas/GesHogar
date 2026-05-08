@@ -1,9 +1,9 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ReceiptText, Tags, LineChart, Scale } from 'lucide-react';
+import { X, LayoutDashboard, ReceiptText, Tags, LineChart, Scale } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-const Sidebar = () => {
+const Sidebar = ({ onClose }) => {
   const links = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
     { name: 'Movimientos', icon: ReceiptText, path: '/movimientos' },
@@ -13,15 +13,24 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className="flex h-full w-64 flex-col border-r bg-card">
-      <div className="flex h-16 items-center px-6">
+    <div className="flex h-full w-64 flex-col border-r bg-card shadow-xl md:shadow-none">
+      <div className="flex h-16 items-center justify-between px-6">
         <h1 className="text-xl font-black tracking-tighter text-primary italic">GesHogar</h1>
+        {onClose && (
+          <button 
+            onClick={onClose} 
+            className="md:hidden p-2 -mr-2 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
         {links.map((link) => (
           <NavLink
             key={link.path}
             to={link.path}
+            onClick={onClose}
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200",

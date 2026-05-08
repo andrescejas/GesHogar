@@ -48,14 +48,14 @@ const Comparativo = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Comparativo</h2>
           <p className="text-muted-foreground">Análisis de desvío entre lo previsto y lo real.</p>
         </div>
         <input 
           type="month" 
-          className="p-2 border rounded-md bg-background text-sm font-medium"
+          className="p-2 border rounded-md bg-background text-sm font-medium w-fit"
           value={mes}
           onChange={(e) => setMes(e.target.value)}
         />
@@ -92,7 +92,7 @@ const Comparativo = () => {
           </div>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <CardTitle>Detalle por Categoría</CardTitle>
               <div className="flex gap-4 text-xs font-medium">
                 <span className="flex items-center gap-1 text-emerald-600"><div className="w-2 h-2 rounded-full bg-emerald-500" /> A favor</span>

@@ -235,7 +235,7 @@ const Proyecciones = () => {
 
       <Card className="bg-slate-900 text-white">
         <CardContent className="p-6">
-          <div className="flex justify-around text-center">
+          <div className="flex flex-col sm:flex-row justify-around gap-4 text-center">
             <div>
               <p className="text-xs opacity-60 uppercase font-bold">Total Ingresos</p>
               <p className="text-2xl font-bold text-emerald-400">

@@ -76,12 +76,12 @@ const Categorias = () => {
     <div className="space-y-10 pb-10">
       {/* SECCIÓN CATEGORÍAS */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-3xl font-black tracking-tight">Categorías Principales</h2>
             <p className="text-muted-foreground text-sm">Grupos generales de ingresos y gastos.</p>
           </div>
-          <Button className="flex items-center gap-2" onClick={() => setIsCatModalOpen(true)}>
+          <Button className="flex items-center gap-2 w-fit" onClick={() => setIsCatModalOpen(true)}>
             <Plus className="h-4 w-4" />
             Nueva Categoría
           </Button>
@@ -153,12 +153,12 @@ const Categorias = () => {
 
       {/* SECCIÓN SUBCATEGORÍAS */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-3xl font-black tracking-tight">Subcategorías</h2>
             <p className="text-muted-foreground text-sm">Detalle específico dentro de cada categoría.</p>
           </div>
-          <Button variant="outline" className="flex items-center gap-2 border-primary text-primary hover:bg-primary/5" onClick={() => setIsSubModalOpen(true)}>
+          <Button variant="outline" className="flex items-center gap-2 border-primary text-primary hover:bg-primary/5 w-fit" onClick={() => setIsSubModalOpen(true)}>
             <Plus className="h-4 w-4" />
             Nueva Subcategoría
           </Button>

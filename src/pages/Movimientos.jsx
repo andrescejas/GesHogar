@@ -74,16 +74,26 @@ const Movimientos = () => {
     });
   };
 
-  const filteredMovimientos = movimientos.filter(m => 
-    m.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.categoria.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredMovimientos = movimientos.filter(m => {
+    const search = searchTerm.toLowerCase();
+    const categoriaNombre = categorias.find(c => c.id === m.categoriaId)?.nombre || '';
+    const subcategoriaNombre = subcategorias.find(s => s.id === m.subcategoriaId)?.nombre || '';
+    
+    return (
+      (m.descripcion || '').toLowerCase().includes(search) ||
+      categoriaNombre.toLowerCase().includes(search) ||
+      subcategoriaNombre.toLowerCase().includes(search) ||
+      (m.responsable || '').toLowerCase().includes(search) ||
+      (m.tipo || '').toLowerCase().includes(search) ||
+      (m.estado || '').toLowerCase().includes(search)
+    );
+  });
 
   if (loading) return <div className="flex items-center justify-center h-full">Cargando...</div>;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">Movimientos</h2>
         <Button className="flex items-center gap-2" onClick={() => setIsModalOpen(true)}>
           <Plus className="h-4 w-4" />
@@ -93,7 +103,7 @@ const Movimientos = () => {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <CardTitle>Historial de Transacciones</CardTitle>
             <div className="flex items-center gap-2">
               <div className="relative">

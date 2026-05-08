@@ -83,14 +83,14 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black tracking-tight">Dashboard</h2>
           <p className="text-muted-foreground text-sm font-medium">Resumen financiero mensual en tiempo real.</p>
         </div>
         <input 
           type="month" 
-          className="p-2 border rounded-md bg-background text-sm font-bold shadow-sm"
+          className="p-2 border rounded-md bg-background text-sm font-bold shadow-sm w-fit"
           value={mes}
           onChange={(e) => setMes(e.target.value)}
         />
