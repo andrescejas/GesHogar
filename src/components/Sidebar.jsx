@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { X, LayoutDashboard, ReceiptText, Tags, LineChart, Scale } from 'lucide-react';
+import { X, LayoutDashboard, ReceiptText, Tags, LineChart, Scale, FileText } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const Sidebar = ({ onClose }) => {
@@ -10,6 +10,7 @@ const Sidebar = ({ onClose }) => {
     { name: 'Categorías', icon: Tags, path: '/categorias' },
     { name: 'Proyecciones', icon: LineChart, path: '/proyecciones' },
     { name: 'Comparativo', icon: Scale, path: '/comparativo' },
+    { name: 'Reporte', icon: FileText, path: '/reporte' },
   ];
 
   return (
