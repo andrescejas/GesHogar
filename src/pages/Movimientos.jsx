@@ -9,6 +9,7 @@ import { cn } from '../lib/utils';
 const Movimientos = () => {
   const { movimientos, categorias, subcategorias, addMovimiento, updateMovimiento, deleteMovimiento, loading } = useData();
   const [searchTerm, setSearchTerm] = useState('');
+  const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
@@ -80,6 +81,8 @@ const Movimientos = () => {
   };
 
   const filteredMovimientos = movimientos.filter(m => {
+    if (mes && !m.fecha.startsWith(mes)) return false;
+
     const search = searchTerm.toLowerCase();
     const categoriaNombre = categorias.find(c => c.id === m.categoriaId)?.nombre || '';
     const subcategoriaNombre = subcategorias.find(s => s.id === m.subcategoriaId)?.nombre || '';
@@ -94,6 +97,10 @@ const Movimientos = () => {
     );
   });
 
+  const totalIngresos = filteredMovimientos.filter(m => m.tipo === 'ingreso').reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
+  const totalEgresos = filteredMovimientos.filter(m => m.tipo === 'egreso').reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
+  const saldo = totalIngresos - totalEgresos;
+
   if (loading) return <div className="flex items-center justify-center h-full">Cargando...</div>;
 
   return (
@@ -106,17 +113,46 @@ const Movimientos = () => {
         </Button>
       </div>
 
+      <div className="grid gap-4 md:grid-cols-3 mb-6">
+        <Card className="border-none shadow-sm bg-emerald-50/50">
+          <CardContent className="p-4">
+            <p className="text-xs font-bold text-emerald-700 uppercase">Total Ingresos</p>
+            <p className="text-2xl font-black text-emerald-600">${totalIngresos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-none shadow-sm bg-rose-50/50">
+          <CardContent className="p-4">
+            <p className="text-xs font-bold text-rose-700 uppercase">Total Egresos</p>
+            <p className="text-2xl font-black text-rose-600">${totalEgresos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-none shadow-sm bg-slate-50/50">
+          <CardContent className="p-4">
+            <p className="text-xs font-bold text-slate-700 uppercase">Saldo del Mes</p>
+            <p className={cn("text-2xl font-black", saldo >= 0 ? "text-slate-800" : "text-rose-600")}>
+              ${saldo.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <CardTitle>Historial de Transacciones</CardTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <input 
+                type="month" 
+                className="p-2 border rounded-md bg-background text-sm font-medium"
+                value={mes}
+                onChange={(e) => setMes(e.target.value)}
+              />
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <input
                   type="text"
                   placeholder="Buscar..."
-                  className="pl-9 pr-4 py-2 text-sm border rounded-md bg-background w-[200px] md:w-[300px]"
+                  className="pl-9 pr-4 py-2 text-sm border rounded-md bg-background w-[200px]"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
