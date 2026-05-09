@@ -24,6 +24,11 @@ const Movimientos = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!formData.categoriaId || !formData.subcategoriaId) {
+      alert('Debes seleccionar una Categoría y una Subcategoría.');
+      return;
+    }
     const data = {
       ...formData,
       monto: Number(formData.monto),
@@ -224,6 +229,7 @@ const Movimientos = () => {
             <label className="text-sm font-medium">Subcategoría</label>
             <select 
               className="w-full p-2 border rounded-md bg-background" 
+              required
               value={formData.subcategoriaId} 
               onChange={(e) => setFormData({...formData, subcategoriaId: e.target.value})}
               disabled={!formData.categoriaId}

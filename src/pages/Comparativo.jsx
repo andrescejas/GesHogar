@@ -7,33 +7,49 @@ import { cn } from '../lib/utils';
 import { ArrowUpRight, ArrowDownRight, Minus, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 const Comparativo = () => {
-  const { categorias, movimientos, proyecciones } = useData();
+  const { categorias, subcategorias, movimientos, proyecciones } = useData();
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
 
   // Consolidar datos comparativos siguiendo el nuevo modelo
   const comparativa = categorias.map(cat => {
-    // Buscar y sumar todos los ítems proyectados de esta categoría en el mes
-    const proyectado = proyecciones
-      .filter(p => p.categoriaId === cat.id && p.mes === mes)
-      .reduce((acc, p) => acc + (Number(p.montoProyectado) || 0), 0);
-    
-    // Sumar movimientos reales del mes
-    const real = movimientos
-      .filter(m => (m.categoriaId === cat.id || m.categoria === cat.nombre) && m.fecha.startsWith(mes) && m.estado !== 'proyectado')
-      .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
-    
-    // Diferencia: 
-    // En INGRESOS: real - proyectado (positivo es bueno)
-    // En EGRESOS: proyectado - real (positivo es bueno, gastaste menos de lo previsto)
+    const subsCat = subcategorias.filter(s => s.categoriaId === cat.id);
+    const subs = [...subsCat, { id: 'sin-sub', nombre: 'Sin Subcategoría', categoriaId: cat.id }];
+
+    const subDetails = subs.map(sub => {
+      const isSinSub = sub.id === 'sin-sub';
+      
+      const proy = proyecciones
+        .filter(p => p.categoriaId === cat.id && p.mes === mes && (isSinSub ? !p.subcategoriaId : p.subcategoriaId === sub.id))
+        .reduce((acc, p) => acc + (Number(p.montoProyectado) || 0), 0);
+        
+      const real = movimientos
+        .filter(m => (m.categoriaId === cat.id || m.categoria === cat.nombre) && m.fecha.startsWith(mes) && m.estado !== 'proyectado' && (isSinSub ? !m.subcategoriaId : m.subcategoriaId === sub.id))
+        .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
+        
+      const diferencia = cat.tipo === 'ingreso' ? real - proy : proy - real;
+      const porcentaje = proy > 0 ? (real / proy) * 100 : 0;
+      
+      return {
+        ...sub,
+        proyectado: proy,
+        real,
+        diferencia,
+        porcentaje
+      };
+    }).filter(s => s.proyectado > 0 || s.real > 0);
+
+    const proyectado = subDetails.reduce((acc, s) => acc + s.proyectado, 0);
+    const real = subDetails.reduce((acc, s) => acc + s.real, 0);
     const diferencia = cat.tipo === 'ingreso' ? real - proyectado : proyectado - real;
     const porcentaje = proyectado > 0 ? (real / proyectado) * 100 : 0;
-    
+
     return {
       ...cat,
       proyectado,
       real,
       diferencia,
-      porcentaje
+      porcentaje,
+      subDetails
     };
   }).filter(c => c.proyectado > 0 || c.real > 0);
 
@@ -113,36 +129,62 @@ const Comparativo = () => {
                   </thead>
                   <tbody className="[&_tr:last-child]:border-0">
                     {comparativa.map((c) => (
-                      <tr key={c.id} className="border-b transition-colors hover:bg-muted/50">
-                        <td className="p-4 align-middle">
-                          <div className="flex flex-col">
-                            <span className="font-semibold">{c.icono} {c.nombre}</span>
-                            <span className="text-[10px] uppercase text-muted-foreground">{c.tipo}</span>
-                          </div>
-                        </td>
-                        <td className="p-4 align-middle text-right text-muted-foreground">${c.proyectado.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td className="p-4 align-middle text-right font-medium">${c.real.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td className={cn(
-                          "p-4 align-middle text-right font-bold",
-                          c.diferencia >= 0 ? "text-emerald-600" : "text-rose-600"
-                        )}>
-                          {c.diferencia > 0 ? '+' : ''}${c.diferencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td className="p-4 align-middle">
-                          <div className="flex flex-col items-center gap-1">
-                            <div className="w-full bg-slate-100 rounded-full h-1.5 max-w-[80px]">
-                              <div 
-                                className={cn(
-                                  "h-1.5 rounded-full",
-                                  c.porcentaje > 100 ? "bg-amber-500" : "bg-primary"
-                                )} 
-                                style={{ width: `${Math.min(c.porcentaje, 100)}%` }}
-                              />
+                      <React.Fragment key={c.id}>
+                        <tr className="border-b transition-colors bg-muted/20">
+                          <td className="p-4 align-middle">
+                            <div className="flex flex-col">
+                              <span className="font-semibold">{c.icono} {c.nombre}</span>
+                              <span className="text-[10px] uppercase text-muted-foreground">{c.tipo}</span>
                             </div>
-                            <span className="text-[10px] font-bold">{c.porcentaje.toFixed(1)}%</span>
-                          </div>
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="p-4 align-middle text-right font-medium">${c.proyectado.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="p-4 align-middle text-right font-bold">${c.real.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className={cn(
+                            "p-4 align-middle text-right font-bold",
+                            c.diferencia >= 0 ? "text-emerald-600" : "text-rose-600"
+                          )}>
+                            {c.diferencia > 0 ? '+' : ''}${c.diferencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="p-4 align-middle">
+                            <div className="flex flex-col items-center gap-1">
+                              <div className="w-full bg-slate-200 rounded-full h-1.5 max-w-[80px]">
+                                <div 
+                                  className={cn(
+                                    "h-1.5 rounded-full",
+                                    c.porcentaje > 100 ? "bg-amber-500" : "bg-primary"
+                                  )} 
+                                  style={{ width: `${Math.min(c.porcentaje, 100)}%` }}
+                                />
+                              </div>
+                              <span className="text-[10px] font-bold">{c.porcentaje.toFixed(1)}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                        {c.subDetails.map(sub => (
+                          <tr key={sub.id} className="border-b transition-colors hover:bg-muted/50 text-sm">
+                            <td className="p-3 pl-8 align-middle text-muted-foreground">
+                              {sub.nombre}
+                            </td>
+                            <td className="p-3 align-middle text-right text-muted-foreground">
+                              ${sub.proyectado.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td className="p-3 align-middle text-right">
+                              ${sub.real.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td className={cn(
+                              "p-3 align-middle text-right font-medium",
+                              sub.diferencia >= 0 ? "text-emerald-500" : "text-rose-500"
+                            )}>
+                              {sub.diferencia > 0 ? '+' : ''}${sub.diferencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td className="p-3 align-middle">
+                              <div className="flex flex-col items-center gap-1 opacity-80">
+                                <span className={cn("text-[10px] font-bold", sub.porcentaje > 100 ? "text-amber-600" : "")}>{sub.porcentaje.toFixed(1)}%</span>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>

@@ -18,7 +18,7 @@ import {
 } from 'recharts';
 
 const Dashboard = () => {
-  const { movimientos, proyecciones, loading, categorias } = useData();
+  const { movimientos, proyecciones, loading, categorias, subcategorias } = useData();
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
 
   // Datos filtrados por mes
@@ -47,17 +47,31 @@ const Dashboard = () => {
       { name: 'Gastos', Real: egresosReales, Proyectado: egresosProyectados },
     ];
 
-    // Datos para gráfico de torta (Gastos por Categoría)
-    const gastosPorCat = categorias
-      .filter(c => c.tipo === 'egreso')
-      .map(cat => ({
-        name: cat.nombre,
-        value: movs
-          .filter(m => (m.categoriaId === cat.id || m.categoria === cat.nombre) && m.estado !== 'proyectado')
-          .reduce((acc, m) => acc + (Number(m.monto) || 0), 0),
-        color: cat.color || '#cbd5e1'
-      }))
-      .filter(d => d.value > 0);
+    // Datos para gráfico de torta (Gastos por Subcategoría)
+    const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f59e0b', '#10b981', '#3b82f6', '#14b8a6', '#84cc16', '#06b6d4'];
+    
+    const gastosSubcat = subcategorias
+      .map(sub => {
+        const cat = categorias.find(c => c.id === sub.categoriaId);
+        if (cat?.tipo !== 'egreso') return null;
+        return {
+          name: `${cat.icono || ''} ${sub.nombre}`,
+          value: movs
+            .filter(m => m.subcategoriaId === sub.id && m.estado !== 'proyectado')
+            .reduce((acc, m) => acc + (Number(m.monto) || 0), 0)
+        };
+      }).filter(d => d && d.value > 0);
+
+    const gastosSinSub = categorias.filter(c => c.tipo === 'egreso').map(cat => ({
+      name: `${cat.icono || ''} ${cat.nombre} (Otros)`,
+      value: movs
+        .filter(m => (m.categoriaId === cat.id || m.categoria === cat.nombre) && !m.subcategoriaId && m.estado !== 'proyectado')
+        .reduce((acc, m) => acc + (Number(m.monto) || 0), 0)
+    })).filter(d => d.value > 0);
+
+    const gastosPorCat = [...gastosSubcat, ...gastosSinSub]
+      .sort((a, b) => b.value - a.value)
+      .map((item, i) => ({ ...item, color: COLORS[i % COLORS.length] }));
 
     return {
       ingresosReales,

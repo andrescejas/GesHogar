@@ -43,8 +43,8 @@ const Proyecciones = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.categoriaId || !formData.monto) {
-      alert('Por favor, selecciona una categoría y un monto válido.');
+    if (!formData.categoriaId || !formData.subcategoriaId || !formData.monto) {
+      alert('Por favor, selecciona una categoría, una subcategoría y un monto válido.');
       return;
     }
 
@@ -128,12 +128,17 @@ const Proyecciones = () => {
       const cat = categorias.find(c => c.id === p.categoriaId);
       return cat?.tipo === tipo;
     });
+    const grouped = {};
+    list.forEach(p => {
+       if(!grouped[p.categoriaId]) grouped[p.categoriaId] = [];
+       grouped[p.categoriaId].push(p);
+    });
+
     return (
       <div className="relative w-full overflow-auto mt-4">
         <table className="w-full text-sm">
           <thead className="border-b">
             <tr>
-              <th className="h-10 px-2 text-left font-medium text-muted-foreground">Categoría</th>
               <th className="h-10 px-2 text-left font-medium text-muted-foreground">Subcategoría</th>
               <th className="h-10 px-2 text-left font-medium text-muted-foreground">Responsable</th>
               <th className="h-10 px-2 text-left font-medium text-muted-foreground">Descripción</th>
@@ -142,37 +147,48 @@ const Proyecciones = () => {
             </tr>
           </thead>
           <tbody>
-            {list.map((p) => (
-              <tr key={p.id} className="border-b hover:bg-muted/50 transition-colors">
-                <td className="p-2 font-medium">
-                  {categorias.find(c => c.id === p.categoriaId)?.icono || '📁'} {categorias.find(c => c.id === p.categoriaId)?.nombre || 'Categoría desconocida'}
-                </td>
-                <td className="p-2 font-medium text-indigo-600">
-                  {subcategorias.find(s => s.id === p.subcategoriaId)?.nombre || '-'}
-                </td>
-                <td className="p-2 text-sm">
-                  {p.responsable || 'Sin asignar'}
-                </td>
-                <td className="p-2 text-sm text-muted-foreground truncate max-w-[150px]" title={p.descripcion}>
-                  {p.descripcion || '-'}
-                </td>
-                <td className="p-2 text-right font-bold">
-                  ${(p.montoProyectado || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </td>
-                <td className="p-2 text-right flex justify-end gap-1">
-                  <Button variant="ghost" size="sm" className="text-indigo-600 h-7 w-7 p-0" onClick={() => handleOpenModal(p)}>
-                    <Edit className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-destructive h-7 w-7 p-0" onClick={() => handleDelete(p.id)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </td>
-              </tr>
-            ))}
-            {list.length === 0 && (
+            {Object.keys(grouped).length === 0 ? (
               <tr>
-                <td colSpan="6" className="p-4 text-center text-muted-foreground italic">Sin proyecciones</td>
+                <td colSpan="5" className="p-4 text-center text-muted-foreground italic">Sin proyecciones</td>
               </tr>
+            ) : (
+              Object.keys(grouped).map(catId => {
+                const cat = categorias.find(c => c.id === catId);
+                const items = grouped[catId];
+                return (
+                  <React.Fragment key={catId}>
+                    <tr className="bg-muted/30">
+                      <td colSpan="5" className="p-2 font-bold text-sm">
+                        {cat?.icono || '📁'} {cat?.nombre || 'Categoría desconocida'}
+                      </td>
+                    </tr>
+                    {items.map(p => (
+                      <tr key={p.id} className="border-b hover:bg-muted/50 transition-colors">
+                        <td className="p-2 pl-6 font-medium text-indigo-600">
+                          {subcategorias.find(s => s.id === p.subcategoriaId)?.nombre || <span className="text-muted-foreground italic">Sin subcategoría</span>}
+                        </td>
+                        <td className="p-2 text-sm">
+                          {p.responsable || 'Sin asignar'}
+                        </td>
+                        <td className="p-2 text-sm text-muted-foreground truncate max-w-[150px]" title={p.descripcion}>
+                          {p.descripcion || '-'}
+                        </td>
+                        <td className="p-2 text-right font-bold">
+                          ${(p.montoProyectado || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-2 text-right flex justify-end gap-1">
+                          <Button variant="ghost" size="sm" className="text-indigo-600 h-7 w-7 p-0" onClick={() => handleOpenModal(p)}>
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-destructive h-7 w-7 p-0" onClick={() => handleDelete(p.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -285,6 +301,7 @@ const Proyecciones = () => {
             <label className="text-sm font-medium">Subcategoría</label>
             <select 
               className="w-full p-2 border rounded-md bg-background" 
+              required
               value={formData.subcategoriaId} 
               onChange={(e) => setFormData({...formData, subcategoriaId: e.target.value})}
               disabled={!formData.categoriaId}
