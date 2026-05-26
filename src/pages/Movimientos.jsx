@@ -376,135 +376,178 @@ const Movimientos = () => {
         onClose={closeModal} 
         title={editingId ? "Editar Movimiento" : "Nuevo Movimiento"}
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Form fields same as before, but using formData and update logic */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Fecha</label>
-              <input type="date" className="w-full p-2 border rounded-md bg-background" required value={formData.fecha} onChange={(e) => setFormData({...formData, fecha: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Tipo</label>
-              <select className="w-full p-2 border rounded-md bg-background" value={formData.tipo} onChange={(e) => setFormData({...formData, tipo: e.target.value})}>
-                <option value="ingreso">Ingreso</option>
-                <option value="egreso">Egreso</option>
-              </select>
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Categoría</label>
-            <select 
-              className="w-full p-2 border rounded-md bg-background" 
-              required 
-              value={formData.categoriaId} 
-              onChange={(e) => setFormData({...formData, categoriaId: e.target.value})}
-            >
-              <option value="">Seleccionar categoría...</option>
-              {categorias
-                .filter(c => c.tipo.toLowerCase() === formData.tipo.toLowerCase())
-                .map(c => (
-                  <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
-                ))
-              }
-            </select>
-          </div>
+        <form onSubmit={handleSubmit}>
+          {/* Layout de 2 columnas: izquierda campos base, derecha tarjeta (si aplica) */}
+          <div className={cn("gap-6", formData.medioPago === 'Tarjeta' && formData.tipo === 'egreso' && !formData.esCuota ? "grid grid-cols-2" : "flex flex-col gap-4")}>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Subcategoría</label>
-            <select 
-              className="w-full p-2 border rounded-md bg-background" 
-              required
-              value={formData.subcategoriaId} 
-              onChange={(e) => setFormData({...formData, subcategoriaId: e.target.value})}
-              disabled={!formData.categoriaId}
-            >
-              <option value="">Seleccionar subcategoría...</option>
-              {subcategorias
-                .filter(s => s.categoriaId === formData.categoriaId)
-                .map(s => (
-                  <option key={s.id} value={s.id}>{s.nombre}</option>
-                ))
-              }
-            </select>
-          </div>
+            {/* ─── Columna Izquierda / Campos Base ─── */}
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Fecha</label>
+                  <input type="date" className="w-full p-2 border rounded-md bg-background text-sm" required value={formData.fecha} onChange={(e) => setFormData({...formData, fecha: e.target.value})} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Tipo</label>
+                  <select className="w-full p-2 border rounded-md bg-background text-sm" value={formData.tipo} onChange={(e) => setFormData({...formData, tipo: e.target.value})}>
+                    <option value="ingreso">Ingreso</option>
+                    <option value="egreso">Egreso</option>
+                  </select>
+                </div>
+              </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Descripción</label>
-            <input type="text" className="w-full p-2 border rounded-md bg-background" required value={formData.descripcion} onChange={(e) => setFormData({...formData, descripcion: e.target.value})} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Monto</label>
-              <input type="number" className="w-full p-2 border rounded-md bg-background" required value={formData.monto} onChange={(e) => setFormData({...formData, monto: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Responsable</label>
-              <select 
-                className="w-full p-2 border rounded-md bg-background" 
-                value={formData.responsable} 
-                onChange={(e) => setFormData({...formData, responsable: e.target.value})}
-              >
-                <option value="">Sin asignar</option>
-                <option value="Andres">Andres</option>
-                <option value="Cecilia">Cecilia</option>
-                <option value="Agustin">Agustin</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Medio de Pago</label>
-              <select 
-                className="w-full p-2 border rounded-md bg-background" 
-                required
-                disabled={editingId && formData.esCuota}
-                value={formData.medioPago || 'Efectivo'} 
-                onChange={(e) => setFormData({...formData, medioPago: e.target.value, tarjeta: '', cantidadCuotas: '1'})}
-              >
-                <option value="Efectivo">Efectivo</option>
-                <option value="Débito">Débito</option>
-                <option value="Transferencia">Transferencia</option>
-                <option value="Tarjeta">Tarjeta</option>
-                <option value="Billetera virtual">Billetera virtual</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Estado</label>
-              <select className="w-full p-2 border rounded-md bg-background" value={formData.estado} onChange={(e) => setFormData({...formData, estado: e.target.value})}>
-                <option value="pagado">Pagado</option>
-                <option value="pendiente">Pendiente</option>
-                <option value="proyectado">Proyectado</option>
-              </select>
-            </div>
-          </div>
-
-          {editingId && formData.esCuota && (
-            <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 font-medium">
-              ⚠️ Estás editando una cuota individual. Para cambiar la financiación completa, elimina esta compra y vuelve a cargarla.
-            </div>
-          )}
-
-          {formData.medioPago === 'Tarjeta' && formData.tipo === 'egreso' && !formData.esCuota && (
-            <div className="p-3 bg-indigo-50/40 border border-indigo-100 rounded-lg space-y-3">
-              <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Detalles de Tarjeta</p>
-              
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-700">Nombre de la Tarjeta</label>
-                <input 
-                  type="text" 
-                  placeholder="Ej: Visa Cecilia, Amex Andres..." 
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Categoría</label>
+                <select 
                   className="w-full p-2 border rounded-md bg-background text-sm" 
-                  required={formData.medioPago === 'Tarjeta' && !formData.esCuota}
-                  value={formData.tarjeta || ''} 
-                  onChange={(e) => setFormData({...formData, tarjeta: e.target.value})} 
-                />
+                  required 
+                  value={formData.categoriaId} 
+                  onChange={(e) => setFormData({...formData, categoriaId: e.target.value})}
+                >
+                  <option value="">Seleccionar categoría...</option>
+                  {categorias
+                    .filter(c => c.tipo.toLowerCase() === formData.tipo.toLowerCase())
+                    .map(c => (
+                      <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
+                    ))
+                  }
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Subcategoría</label>
+                <select 
+                  className="w-full p-2 border rounded-md bg-background text-sm" 
+                  required
+                  value={formData.subcategoriaId} 
+                  onChange={(e) => setFormData({...formData, subcategoriaId: e.target.value})}
+                  disabled={!formData.categoriaId}
+                >
+                  <option value="">Seleccionar subcategoría...</option>
+                  {subcategorias
+                    .filter(s => s.categoriaId === formData.categoriaId)
+                    .map(s => (
+                      <option key={s.id} value={s.id}>{s.nombre}</option>
+                    ))
+                  }
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Descripción</label>
+                <input type="text" className="w-full p-2 border rounded-md bg-background text-sm" required value={formData.descripcion} onChange={(e) => setFormData({...formData, descripcion: e.target.value})} />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Monto</label>
+                  <input type="number" className="w-full p-2 border rounded-md bg-background text-sm" required value={formData.monto} onChange={(e) => setFormData({...formData, monto: e.target.value})} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Responsable</label>
+                  <select 
+                    className="w-full p-2 border rounded-md bg-background text-sm" 
+                    value={formData.responsable} 
+                    onChange={(e) => setFormData({...formData, responsable: e.target.value})}
+                  >
+                    <option value="">Sin asignar</option>
+                    <option value="Andres">Andres</option>
+                    <option value="Cecilia">Cecilia</option>
+                    <option value="Agustin">Agustin</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Medio de Pago</label>
+                  <select 
+                    className="w-full p-2 border rounded-md bg-background text-sm" 
+                    required
+                    disabled={editingId && formData.esCuota}
+                    value={formData.medioPago || 'Efectivo'} 
+                    onChange={(e) => {
+                      const mp = e.target.value;
+                      // Si se elige Tarjeta, forzar estado pendiente automáticamente
+                      setFormData({
+                        ...formData,
+                        medioPago: mp,
+                        tarjeta: '',
+                        cantidadCuotas: '1',
+                        estado: mp === 'Tarjeta' ? 'pendiente' : formData.estado
+                      });
+                    }}
+                  >
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Débito">Débito</option>
+                    <option value="Transferencia">Transferencia</option>
+                    <option value="Tarjeta">Tarjeta</option>
+                    <option value="Billetera virtual">Billetera virtual</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">
+                    Estado
+                    {formData.medioPago === 'Tarjeta' && (
+                      <span className="ml-1.5 text-[10px] text-amber-600 font-bold uppercase tracking-wide bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                        Auto
+                      </span>
+                    )}
+                  </label>
+                  <select 
+                    className={cn("w-full p-2 border rounded-md bg-background text-sm", formData.medioPago === 'Tarjeta' ? "text-amber-700 font-semibold border-amber-300 bg-amber-50/30" : "")}
+                    value={formData.estado} 
+                    onChange={(e) => setFormData({...formData, estado: e.target.value})}
+                  >
+                    <option value="pagado">Pagado</option>
+                    <option value="pendiente">Pendiente</option>
+                    <option value="proyectado">Proyectado</option>
+                  </select>
+                </div>
+              </div>
+
+              {formData.tipo === 'egreso' && (formData.medioPago !== 'Tarjeta' || Number(formData.cantidadCuotas || 1) <= 1) && !formData.esCuota && (
+                <div className="flex items-center gap-2 py-1">
+                  <input 
+                    type="checkbox" 
+                    id="recurrente" 
+                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    checked={formData.recurrente || false} 
+                    onChange={(e) => setFormData({...formData, recurrente: e.target.checked})} 
+                  />
+                  <label htmlFor="recurrente" className="text-sm font-medium text-slate-700 cursor-pointer select-none">
+                    ¿Es un gasto recurrente mensual?
+                  </label>
+                </div>
+              )}
+
+              {editingId && formData.esCuota && (
+                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 font-medium">
+                  ⚠️ Estás editando una cuota individual. Para cambiar la financiación completa, elimina esta compra y vuelve a cargarla.
+                </div>
+              )}
+            </div>
+
+            {/* ─── Columna Derecha / Detalles de Tarjeta ─── */}
+            {formData.medioPago === 'Tarjeta' && formData.tipo === 'egreso' && !formData.esCuota && (
+              <div className="flex flex-col gap-3 p-4 bg-indigo-50/40 border border-indigo-100 rounded-xl">
+                <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
+                  💳 Detalles de Tarjeta
+                </p>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">Nombre de la Tarjeta</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ej: Visa Cecilia, Amex Andres..." 
+                    className="w-full p-2 border rounded-md bg-background text-sm" 
+                    required={formData.medioPago === 'Tarjeta' && !formData.esCuota}
+                    value={formData.tarjeta || ''} 
+                    onChange={(e) => setFormData({...formData, tarjeta: e.target.value})} 
+                  />
+                </div>
+
+                <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-700">Cantidad de Cuotas</label>
                   <input 
                     type="number" 
@@ -516,48 +559,33 @@ const Movimientos = () => {
                     onChange={(e) => setFormData({...formData, cantidadCuotas: e.target.value})} 
                   />
                 </div>
-                {Number(formData.cantidadCuotas) > 1 && (
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-slate-700">Fecha 1er Vencimiento</label>
-                    <input 
-                      type="date" 
-                      className="w-full p-2 border rounded-md bg-background text-sm font-medium" 
-                      required={Number(formData.cantidadCuotas) > 1}
-                      value={formData.fechaPrimeraCuota || ''} 
-                      onChange={(e) => setFormData({...formData, fechaPrimeraCuota: e.target.value})} 
-                    />
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">Fecha 1er Vencimiento</label>
+                  <input 
+                    type="date" 
+                    className="w-full p-2 border rounded-md bg-background text-sm font-medium" 
+                    required={formData.medioPago === 'Tarjeta' && !formData.esCuota}
+                    value={formData.fechaPrimeraCuota || ''} 
+                    onChange={(e) => setFormData({...formData, fechaPrimeraCuota: e.target.value})} 
+                  />
+                </div>
+
+                {formData.monto && formData.fechaPrimeraCuota && (
+                  <div className="p-2.5 bg-indigo-100/60 rounded-md text-xs text-indigo-900 font-medium leading-relaxed mt-auto">
+                    {Number(formData.cantidadCuotas) > 1 ? (
+                      <span>💡 Referencia informativa + <span className="font-bold">{formData.cantidadCuotas}</span> cuotas de <span className="font-bold">${(Number(formData.monto) / Number(formData.cantidadCuotas)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> desde <span className="font-bold">{new Date(formData.fechaPrimeraCuota + 'T00:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</span>.</span>
+                    ) : (
+                      <span>💡 Referencia informativa + <span className="font-bold">1 cuota única</span> de <span className="font-bold">${(Number(formData.monto)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> en <span className="font-bold">{new Date(formData.fechaPrimeraCuota + 'T00:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</span>.</span>
+                    )}
                   </div>
                 )}
               </div>
+            )}
 
-              {Number(formData.cantidadCuotas || 1) >= 1 && formData.monto && formData.fechaPrimeraCuota && (
-                <div className="p-2.5 bg-indigo-100/60 rounded-md text-xs text-indigo-900 font-medium">
-                  {Number(formData.cantidadCuotas) > 1 ? (
-                    <span>💡 Se registrará una compra de referencia (informativa) y <span className="font-bold">{formData.cantidadCuotas}</span> cuotas de <span className="font-bold">${(Number(formData.monto) / Number(formData.cantidadCuotas)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> con primer vencimiento en <span className="font-bold">{new Date(formData.fechaPrimeraCuota + 'T00:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</span>.</span>
-                  ) : (
-                    <span>💡 Se registrará una compra de referencia (informativa) por <span className="font-bold">${(Number(formData.monto)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> y <span className="font-bold">1 cuota única</span> a vencer en <span className="font-bold">{new Date(formData.fechaPrimeraCuota + 'T00:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</span>.</span>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+          </div>
 
-          {formData.tipo === 'egreso' && (formData.medioPago !== 'Tarjeta' || Number(formData.cantidadCuotas || 1) <= 1) && !formData.esCuota && (
-            <div className="flex items-center gap-2 py-1">
-              <input 
-                type="checkbox" 
-                id="recurrente" 
-                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                checked={formData.recurrente || false} 
-                onChange={(e) => setFormData({...formData, recurrente: e.target.checked})} 
-              />
-              <label htmlFor="recurrente" className="text-sm font-medium text-slate-700 cursor-pointer select-none">
-                ¿Es un gasto recurrente mensual? (Proyectar automáticamente en meses futuros)
-              </label>
-            </div>
-          )}
-
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-end gap-3 pt-5 mt-2 border-t">
             <Button variant="outline" type="button" onClick={closeModal}>Cancelar</Button>
             <Button type="submit">{editingId ? "Guardar Cambios" : "Crear Movimiento"}</Button>
           </div>
