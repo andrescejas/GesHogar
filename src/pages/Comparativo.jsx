@@ -30,7 +30,8 @@ const Comparativo = () => {
             m.esCuota === true && 
             m.fecha.startsWith(mes) && 
             m.categoriaId === cat.id && 
-            (isSinSub ? !m.subcategoriaId : m.subcategoriaId === sub.id)
+            (isSinSub ? !m.subcategoriaId : m.subcategoriaId === sub.id) &&
+            m.contabiliza !== false
           )
           .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
 
@@ -39,7 +40,8 @@ const Comparativo = () => {
             m.recurrente === true && 
             m.fecha.substring(0, 7) <= mes && 
             m.categoriaId === cat.id && 
-            (isSinSub ? !m.subcategoriaId : m.subcategoriaId === sub.id)
+            (isSinSub ? !m.subcategoriaId : m.subcategoriaId === sub.id) &&
+            m.contabiliza !== false
           )
           .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
 
@@ -52,7 +54,7 @@ const Comparativo = () => {
           m.fecha.startsWith(mes) && 
           m.estado !== 'proyectado' && 
           (isSinSub ? !m.subcategoriaId : m.subcategoriaId === sub.id) &&
-          !(m.medioPago === 'Tarjeta' && m.cantidadCuotas > 1 && m.esCuota === false)
+          m.contabiliza !== false
         )
         .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
         

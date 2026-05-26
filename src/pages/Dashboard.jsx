@@ -27,11 +27,11 @@ const Dashboard = () => {
     const proys = proyecciones.filter(p => p.mes === mes);
 
     const ingresosReales = movs
-      .filter(m => m.tipo === 'ingreso' && m.estado !== 'proyectado')
+      .filter(m => m.tipo === 'ingreso' && m.estado !== 'proyectado' && m.contabiliza !== false)
       .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
       
     const egresosReales = movs
-      .filter(m => m.tipo === 'egreso' && m.estado !== 'proyectado' && !(m.medioPago === 'Tarjeta' && m.cantidadCuotas > 1 && m.esCuota === false))
+      .filter(m => m.tipo === 'egreso' && m.estado !== 'proyectado' && m.contabiliza !== false)
       .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
     
     const ingresosProyectados = proys.filter(p => p.tipo === 'ingreso').reduce((acc, p) => acc + p.montoProyectado, 0);
@@ -41,13 +41,15 @@ const Dashboard = () => {
     const cuotasMes = movimientos.filter(m => 
       m.esCuota === true && 
       m.fecha.startsWith(mes) && 
-      m.tipo === 'egreso'
+      m.tipo === 'egreso' &&
+      m.contabiliza !== false
     ).reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
     
     const recurrentesMes = movimientos.filter(m => 
       m.recurrente === true && 
       m.fecha.substring(0, 7) <= mes && 
-      m.tipo === 'egreso'
+      m.tipo === 'egreso' &&
+      m.contabiliza !== false
     ).reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
 
     const egresosProyectados = egresosProyFisicos + cuotasMes + recurrentesMes;
@@ -72,7 +74,7 @@ const Dashboard = () => {
         return {
           name: `${cat.icono || ''} ${sub.nombre}`,
           value: movs
-            .filter(m => m.subcategoriaId === sub.id && m.estado !== 'proyectado' && !(m.medioPago === 'Tarjeta' && m.cantidadCuotas > 1 && m.esCuota === false))
+            .filter(m => m.subcategoriaId === sub.id && m.estado !== 'proyectado' && m.contabiliza !== false)
             .reduce((acc, m) => acc + (Number(m.monto) || 0), 0)
         };
       }).filter(d => d && d.value > 0);
@@ -80,7 +82,7 @@ const Dashboard = () => {
     const gastosSinSub = categorias.filter(c => c.tipo === 'egreso').map(cat => ({
       name: `${cat.icono || ''} ${cat.nombre} (Otros)`,
       value: movs
-        .filter(m => (m.categoriaId === cat.id || m.categoria === cat.nombre) && !m.subcategoriaId && m.estado !== 'proyectado' && !(m.medioPago === 'Tarjeta' && m.cantidadCuotas > 1 && m.esCuota === false))
+        .filter(m => (m.categoriaId === cat.id || m.categoria === cat.nombre) && !m.subcategoriaId && m.estado !== 'proyectado' && m.contabiliza !== false)
         .reduce((acc, m) => acc + (Number(m.monto) || 0), 0)
     })).filter(d => d.value > 0);
 

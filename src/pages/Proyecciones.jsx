@@ -27,7 +27,7 @@ const Proyecciones = () => {
     const proManuales = proyecciones.filter(p => p.mes === mes);
     
     const proysVirtualesCuotas = (movimientos || [])
-      .filter(m => m.esCuota === true && m.fecha.startsWith(mes) && m.tipo === 'egreso')
+      .filter(m => m.esCuota === true && m.fecha.startsWith(mes) && m.tipo === 'egreso' && m.contabiliza !== false)
       .map(m => ({
         id: `virtual-cuota-${m.id}`,
         categoriaId: m.categoriaId,
@@ -41,7 +41,7 @@ const Proyecciones = () => {
       }));
 
     const proysVirtualesRecurrentes = (movimientos || [])
-      .filter(m => m.recurrente === true && m.fecha.substring(0, 7) <= mes && m.tipo === 'egreso')
+      .filter(m => m.recurrente === true && m.fecha.substring(0, 7) <= mes && m.tipo === 'egreso' && m.contabiliza !== false)
       .map(m => ({
         id: `virtual-recurrente-${m.id}`,
         categoriaId: m.categoriaId,

@@ -39,8 +39,8 @@ const Movimientos = () => {
 
     const totalCuotas = Number(formData.cantidadCuotas || 1);
 
-    // Lógica para registrar nueva compra financiada
-    if (!editingId && formData.medioPago === 'Tarjeta' && formData.tipo === 'egreso' && totalCuotas > 1) {
+    // Lógica para registrar nueva compra financiada o en 1 cuota con Tarjeta
+    if (!editingId && formData.medioPago === 'Tarjeta' && formData.tipo === 'egreso') {
       try {
         const dataOriginal = {
           fecha: formData.fecha,
@@ -56,6 +56,7 @@ const Movimientos = () => {
           cantidadCuotas: totalCuotas,
           fechaPrimeraCuota: formData.fechaPrimeraCuota,
           esCuota: false,
+          contabiliza: false, // Compra de referencia no contabiliza
           mes: formData.fecha.substring(0, 7)
         };
 
@@ -65,7 +66,7 @@ const Movimientos = () => {
         // Actualizar el origen con su compraId
         await updateMovimiento(originalId, { compraId: originalId });
 
-        // Generar cuotas individuales en lote
+        // Generar cuotas individuales
         const promesas = [];
         const cuotaMonto = Number((Number(formData.monto) / totalCuotas).toFixed(2));
 
@@ -80,7 +81,7 @@ const Movimientos = () => {
             categoriaId: formData.categoriaId,
             subcategoriaId: formData.subcategoriaId,
             responsable: formData.responsable || '',
-            descripcion: `${formData.descripcion} (Cuota ${i}/${totalCuotas})`,
+            descripcion: totalCuotas > 1 ? `${formData.descripcion} (Cuota ${i}/${totalCuotas})` : `${formData.descripcion} (Cuota única)`,
             monto: cuotaMonto,
             fecha: cuotaFecha,
             mes: cuotaMes,
@@ -91,15 +92,16 @@ const Movimientos = () => {
             numeroCuota: i,
             cantidadCuotas: totalCuotas,
             movimientoOrigenId: originalId,
-            compraId: originalId
+            compraId: originalId,
+            contabiliza: true // Las cuotas sí contabilizan
           }));
         }
 
         await Promise.all(promesas);
-        alert(`Se guardó la compra y se generaron ${totalCuotas} cuotas de $${cuotaMonto.toLocaleString(undefined, { minimumFractionDigits: 2 })}.`);
+        alert(`Se guardó la compra con tarjeta y se generaron las cuotas correspondientes.`);
       } catch (error) {
-        console.error("Error al registrar compra financiada:", error);
-        alert("Error al registrar la compra financiada.");
+        console.error("Error al registrar compra con tarjeta:", error);
+        alert("Error al registrar la compra con tarjeta.");
       }
     } else {
       // Guardado o edición tradicional
@@ -118,6 +120,7 @@ const Movimientos = () => {
         fechaPrimeraCuota: formData.medioPago === 'Tarjeta' ? formData.fechaPrimeraCuota : '',
         recurrente: formData.tipo === 'egreso' ? (formData.recurrente || false) : false,
         esCuota: formData.esCuota || false,
+        contabiliza: formData.esCuota === false && formData.medioPago === 'Tarjeta' ? false : (formData.contabiliza !== undefined ? formData.contabiliza : true),
         mes: formData.fecha.substring(0, 7)
       };
 
@@ -198,9 +201,6 @@ const Movimientos = () => {
   const filteredMovimientos = movimientos.filter(m => {
     if (mes && !m.fecha.startsWith(mes)) return false;
 
-    // Excluir el movimiento de origen de compras financiadas para no duplicar el gasto
-    if (m.medioPago === 'Tarjeta' && m.cantidadCuotas > 1 && m.esCuota === false) return false;
-
     const search = searchTerm.toLowerCase();
     const categoriaNombre = categorias.find(c => c.id === m.categoriaId)?.nombre || '';
     const subcategoriaNombre = subcategorias.find(s => s.id === m.subcategoriaId)?.nombre || '';
@@ -216,7 +216,7 @@ const Movimientos = () => {
   });
 
   const totalIngresos = filteredMovimientos.filter(m => m.tipo === 'ingreso').reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
-  const totalEgresos = filteredMovimientos.filter(m => m.tipo === 'egreso').reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
+  const totalEgresos = filteredMovimientos.filter(m => m.tipo === 'egreso' && m.contabiliza !== false).reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
   const saldo = totalIngresos - totalEgresos;
 
   if (loading) return <div className="flex items-center justify-center h-full">Cargando...</div>;
@@ -296,32 +296,63 @@ const Movimientos = () => {
               </thead>
               <tbody className="[&_tr:last-child]:border-0">
                 {filteredMovimientos.map((m) => (
-                  <tr key={m.id} className="border-b transition-colors hover:bg-muted/50">
+                  <tr key={m.id} className={cn("border-b transition-colors hover:bg-muted/50 text-slate-800 font-medium", m.contabiliza === false ? "bg-slate-50/50 text-slate-400 opacity-80" : "")}>
                     <td className="p-4 align-middle whitespace-nowrap">{m.fecha}</td>
                     <td className="p-4 align-middle">
-                      <span className={cn(
-                        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase",
-                        m.tipo === 'ingreso' ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-                      )}>
-                        {m.tipo}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className={cn(
+                          "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase w-max",
+                          m.tipo === 'ingreso' ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                        )}>
+                          {m.tipo}
+                        </span>
+                        {m.medioPago && (
+                          <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold w-max uppercase tracking-wider">
+                            {m.medioPago}
+                          </span>
+                        )}
+                      </div>
                     </td>
-                    <td className="p-4 align-middle">
+                    <td className="p-4 align-middle whitespace-nowrap">
                       {categorias.find(c => c.id === m.categoriaId)?.icono} {categorias.find(c => c.id === m.categoriaId)?.nombre || 'Sin categoría'}
                     </td>
                     <td className="p-4 align-middle">
                       {subcategorias.find(s => s.id === m.subcategoriaId)?.nombre || '-'}
                     </td>
-                    <td className="p-4 align-middle">{m.descripcion}</td>
+                    <td className="p-4 align-middle max-w-[200px] truncate" title={m.descripcion}>
+                      <div className="flex flex-col gap-0.5">
+                        <span className={cn("font-medium", m.contabiliza === false ? "font-normal text-slate-400" : "")}>
+                          {m.descripcion}
+                        </span>
+                        {m.tarjeta && (
+                          <span className="text-[10px] text-indigo-500 font-bold uppercase tracking-wide">
+                            💳 {m.tarjeta}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="p-4 align-middle font-medium">{m.responsable || 'Sin asignar'}</td>
                     <td className="p-4 align-middle text-right font-medium">
-                      {m.tipo === 'ingreso' ? '+' : '-'}${Number(m.monto).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {m.contabiliza === false ? (
+                        <div className="flex flex-col items-end">
+                          <span className="line-through text-slate-400 font-normal">
+                            ${(Number(m.monto) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <span className="text-[9px] text-slate-500 font-bold bg-slate-100 px-1 py-0.5 rounded mt-0.5 uppercase tracking-wider">
+                            Informativo
+                          </span>
+                        </div>
+                      ) : (
+                        <span>
+                          {m.tipo === 'ingreso' ? '+' : '-'}${Number(m.monto).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      )}
                     </td>
                     <td className="p-4 align-middle">
                       <span className={cn(
-                        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase",
-                        m.estado === 'pagado' ? "bg-blue-100 text-blue-800" : 
-                        m.estado === 'pendiente' ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-800"
+                        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase border",
+                        m.estado === 'pagado' ? "bg-blue-100 text-blue-800 border-blue-200" : 
+                        m.estado === 'pendiente' ? "bg-amber-100 text-amber-800 border-amber-200" : "bg-slate-100 text-slate-800 border-slate-200"
                       )}>
                         {m.estado}
                       </span>
@@ -499,9 +530,13 @@ const Movimientos = () => {
                 )}
               </div>
 
-              {Number(formData.cantidadCuotas) > 1 && formData.monto && formData.fechaPrimeraCuota && (
+              {Number(formData.cantidadCuotas || 1) >= 1 && formData.monto && formData.fechaPrimeraCuota && (
                 <div className="p-2.5 bg-indigo-100/60 rounded-md text-xs text-indigo-900 font-medium">
-                  💡 Se generarán <span className="font-bold">{formData.cantidadCuotas}</span> cuotas de <span className="font-bold">${(Number(formData.monto) / Number(formData.cantidadCuotas)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> con primer vencimiento en <span className="font-bold">{new Date(formData.fechaPrimeraCuota + 'T00:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</span>.
+                  {Number(formData.cantidadCuotas) > 1 ? (
+                    <span>💡 Se registrará una compra de referencia (informativa) y <span className="font-bold">{formData.cantidadCuotas}</span> cuotas de <span className="font-bold">${(Number(formData.monto) / Number(formData.cantidadCuotas)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> con primer vencimiento en <span className="font-bold">{new Date(formData.fechaPrimeraCuota + 'T00:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</span>.</span>
+                  ) : (
+                    <span>💡 Se registrará una compra de referencia (informativa) por <span className="font-bold">${(Number(formData.monto)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> y <span className="font-bold">1 cuota única</span> a vencer en <span className="font-bold">{new Date(formData.fechaPrimeraCuota + 'T00:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</span>.</span>
+                  )}
                 </div>
               )}
             </div>
