@@ -6,9 +6,10 @@ import Modal from '../components/ui/Modal';
 import { useData } from '../context/DataContext';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { cn } from '../lib/utils';
 
 const Proyecciones = () => {
-  const { categorias, subcategorias, proyecciones, saveProyeccion, updateProyeccion, loading: contextLoading } = useData();
+  const { categorias, subcategorias, proyecciones, movimientos, saveProyeccion, updateProyeccion, loading: contextLoading } = useData();
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -22,7 +23,39 @@ const Proyecciones = () => {
     monto: '',
   });
 
-  const proyeccionesList = proyecciones.filter(p => p.mes === mes);
+  const proyeccionesList = React.useMemo(() => {
+    const proManuales = proyecciones.filter(p => p.mes === mes);
+    
+    const proysVirtualesCuotas = (movimientos || [])
+      .filter(m => m.esCuota === true && m.fecha.startsWith(mes) && m.tipo === 'egreso')
+      .map(m => ({
+        id: `virtual-cuota-${m.id}`,
+        categoriaId: m.categoriaId,
+        subcategoriaId: m.subcategoriaId,
+        montoProyectado: Number(m.monto),
+        tipo: 'egreso',
+        descripcion: m.descripcion,
+        responsable: m.responsable,
+        isVirtual: true,
+        virtualType: 'Tarjeta'
+      }));
+
+    const proysVirtualesRecurrentes = (movimientos || [])
+      .filter(m => m.recurrente === true && m.fecha.substring(0, 7) <= mes && m.tipo === 'egreso')
+      .map(m => ({
+        id: `virtual-recurrente-${m.id}`,
+        categoriaId: m.categoriaId,
+        subcategoriaId: m.subcategoriaId,
+        montoProyectado: Number(m.monto),
+        tipo: 'egreso',
+        descripcion: `${m.descripcion} (Recurrente)`,
+        responsable: m.responsable,
+        isVirtual: true,
+        virtualType: 'Recurrente'
+      }));
+
+    return [...proManuales, ...proysVirtualesCuotas, ...proysVirtualesRecurrentes];
+  }, [proyecciones, movimientos, mes]);
 
   const handleOpenModal = (proyeccion = null) => {
     if (proyeccion) {
@@ -163,9 +196,19 @@ const Proyecciones = () => {
                       </td>
                     </tr>
                     {items.map(p => (
-                      <tr key={p.id} className="border-b hover:bg-muted/50 transition-colors">
+                      <tr key={p.id} className={cn("border-b hover:bg-muted/50 transition-colors", p.isVirtual ? "bg-slate-50/40" : "")}>
                         <td className="p-2 pl-6 font-medium text-indigo-600">
-                          {subcategorias.find(s => s.id === p.subcategoriaId)?.nombre || <span className="text-muted-foreground italic">Sin subcategoría</span>}
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5">
+                            <span>{subcategorias.find(s => s.id === p.subcategoriaId)?.nombre || <span className="text-muted-foreground italic">Sin subcategoría</span>}</span>
+                            {p.isVirtual && (
+                              <span className={cn(
+                                "inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider",
+                                p.virtualType === 'Tarjeta' ? "bg-indigo-50 text-indigo-700 border border-indigo-200" : "bg-purple-50 text-purple-700 border border-purple-200"
+                              )}>
+                                {p.virtualType === 'Tarjeta' ? '💳 Tarjeta' : '🔄 Recurrente'}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="p-2 text-sm">
                           {p.responsable || 'Sin asignar'}
@@ -173,16 +216,22 @@ const Proyecciones = () => {
                         <td className="p-2 text-sm text-muted-foreground truncate max-w-[150px]" title={p.descripcion}>
                           {p.descripcion || '-'}
                         </td>
-                        <td className="p-2 text-right font-bold">
+                        <td className="p-2 text-right font-bold text-slate-800">
                           ${(p.montoProyectado || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                         <td className="p-2 text-right flex justify-end gap-1">
-                          <Button variant="ghost" size="sm" className="text-indigo-600 h-7 w-7 p-0" onClick={() => handleOpenModal(p)}>
-                            <Edit className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-destructive h-7 w-7 p-0" onClick={() => handleDelete(p.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          {!p.isVirtual ? (
+                            <>
+                              <Button variant="ghost" size="sm" className="text-indigo-600 h-7 w-7 p-0" onClick={() => handleOpenModal(p)}>
+                                <Edit className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="sm" className="text-destructive h-7 w-7 p-0" onClick={() => handleDelete(p.id)}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground italic px-2">Automático</span>
+                          )}
                         </td>
                       </tr>
                     ))}

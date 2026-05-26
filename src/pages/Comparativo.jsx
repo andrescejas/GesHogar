@@ -18,12 +18,42 @@ const Comparativo = () => {
     const subDetails = subs.map(sub => {
       const isSinSub = sub.id === 'sin-sub';
       
-      const proy = proyecciones
+      const proyFisica = proyecciones
         .filter(p => p.categoriaId === cat.id && p.mes === mes && (isSinSub ? !p.subcategoriaId : p.subcategoriaId === sub.id))
         .reduce((acc, p) => acc + (Number(p.montoProyectado) || 0), 0);
         
+      let proy = proyFisica;
+
+      if (cat.tipo === 'egreso') {
+        const cuotasProy = movimientos
+          .filter(m => 
+            m.esCuota === true && 
+            m.fecha.startsWith(mes) && 
+            m.categoriaId === cat.id && 
+            (isSinSub ? !m.subcategoriaId : m.subcategoriaId === sub.id)
+          )
+          .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
+
+        const recurrentesProy = movimientos
+          .filter(m => 
+            m.recurrente === true && 
+            m.fecha.substring(0, 7) <= mes && 
+            m.categoriaId === cat.id && 
+            (isSinSub ? !m.subcategoriaId : m.subcategoriaId === sub.id)
+          )
+          .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
+
+        proy = proyFisica + cuotasProy + recurrentesProy;
+      }
+        
       const real = movimientos
-        .filter(m => (m.categoriaId === cat.id || m.categoria === cat.nombre) && m.fecha.startsWith(mes) && m.estado !== 'proyectado' && (isSinSub ? !m.subcategoriaId : m.subcategoriaId === sub.id))
+        .filter(m => 
+          (m.categoriaId === cat.id || m.categoria === cat.nombre) && 
+          m.fecha.startsWith(mes) && 
+          m.estado !== 'proyectado' && 
+          (isSinSub ? !m.subcategoriaId : m.subcategoriaId === sub.id) &&
+          !(m.medioPago === 'Tarjeta' && m.cantidadCuotas > 1 && m.esCuota === false)
+        )
         .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
         
       const diferencia = cat.tipo === 'ingreso' ? real - proy : proy - real;

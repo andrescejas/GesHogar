@@ -20,7 +20,13 @@ const Movimientos = () => {
     descripcion: '',
     monto: '',
     responsable: '',
-    estado: 'pagado'
+    estado: 'pagado',
+    medioPago: 'Efectivo',
+    tarjeta: '',
+    cantidadCuotas: '1',
+    fechaPrimeraCuota: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+    recurrente: false,
+    esCuota: false
   });
 
   const handleSubmit = async (e) => {
@@ -30,16 +36,96 @@ const Movimientos = () => {
       alert('Debes seleccionar una Categoría y una Subcategoría.');
       return;
     }
-    const data = {
-      ...formData,
-      monto: Number(formData.monto),
-      mes: formData.fecha.substring(0, 7) // Formato YYYY-MM
-    };
 
-    if (editingId) {
-      await updateMovimiento(editingId, data);
+    const totalCuotas = Number(formData.cantidadCuotas || 1);
+
+    // Lógica para registrar nueva compra financiada
+    if (!editingId && formData.medioPago === 'Tarjeta' && formData.tipo === 'egreso' && totalCuotas > 1) {
+      try {
+        const dataOriginal = {
+          fecha: formData.fecha,
+          tipo: 'egreso',
+          categoriaId: formData.categoriaId,
+          subcategoriaId: formData.subcategoriaId,
+          descripcion: formData.descripcion,
+          monto: Number(formData.monto),
+          responsable: formData.responsable || '',
+          estado: 'pendiente',
+          medioPago: 'Tarjeta',
+          tarjeta: formData.tarjeta,
+          cantidadCuotas: totalCuotas,
+          fechaPrimeraCuota: formData.fechaPrimeraCuota,
+          esCuota: false,
+          mes: formData.fecha.substring(0, 7)
+        };
+
+        const originalDoc = await addMovimiento(dataOriginal);
+        const originalId = originalDoc.id;
+
+        // Actualizar el origen con su compraId
+        await updateMovimiento(originalId, { compraId: originalId });
+
+        // Generar cuotas individuales en lote
+        const promesas = [];
+        const cuotaMonto = Number((Number(formData.monto) / totalCuotas).toFixed(2));
+
+        for (let i = 1; i <= totalCuotas; i++) {
+          const baseDate = new Date(formData.fechaPrimeraCuota + 'T00:00:00');
+          baseDate.setMonth(baseDate.getMonth() + (i - 1));
+          const cuotaFecha = baseDate.toISOString().split('T')[0];
+          const cuotaMes = cuotaFecha.substring(0, 7);
+
+          promesas.push(addMovimiento({
+            tipo: 'egreso',
+            categoriaId: formData.categoriaId,
+            subcategoriaId: formData.subcategoriaId,
+            responsable: formData.responsable || '',
+            descripcion: `${formData.descripcion} (Cuota ${i}/${totalCuotas})`,
+            monto: cuotaMonto,
+            fecha: cuotaFecha,
+            mes: cuotaMes,
+            estado: 'pendiente',
+            medioPago: 'Tarjeta',
+            tarjeta: formData.tarjeta,
+            esCuota: true,
+            numeroCuota: i,
+            cantidadCuotas: totalCuotas,
+            movimientoOrigenId: originalId,
+            compraId: originalId
+          }));
+        }
+
+        await Promise.all(promesas);
+        alert(`Se guardó la compra y se generaron ${totalCuotas} cuotas de $${cuotaMonto.toLocaleString(undefined, { minimumFractionDigits: 2 })}.`);
+      } catch (error) {
+        console.error("Error al registrar compra financiada:", error);
+        alert("Error al registrar la compra financiada.");
+      }
     } else {
-      await addMovimiento(data);
+      // Guardado o edición tradicional
+      const data = {
+        fecha: formData.fecha,
+        tipo: formData.tipo,
+        categoriaId: formData.categoriaId,
+        subcategoriaId: formData.subcategoriaId,
+        descripcion: formData.descripcion,
+        monto: Number(formData.monto),
+        responsable: formData.responsable || '',
+        estado: formData.estado,
+        medioPago: formData.medioPago || 'Efectivo',
+        tarjeta: formData.medioPago === 'Tarjeta' ? formData.tarjeta : '',
+        cantidadCuotas: formData.medioPago === 'Tarjeta' ? totalCuotas : 1,
+        fechaPrimeraCuota: formData.medioPago === 'Tarjeta' ? formData.fechaPrimeraCuota : '',
+        recurrente: formData.tipo === 'egreso' ? (formData.recurrente || false) : false,
+        esCuota: formData.esCuota || false,
+        mes: formData.fecha.substring(0, 7)
+      };
+
+      if (editingId) {
+        await updateMovimiento(editingId, data);
+      } else {
+        await addMovimiento(data);
+      }
     }
     closeModal();
   };
@@ -54,14 +140,37 @@ const Movimientos = () => {
       descripcion: m.descripcion || '',
       monto: m.monto,
       responsable: m.responsable || '',
-      estado: m.estado
+      estado: m.estado,
+      medioPago: m.medioPago || 'Efectivo',
+      tarjeta: m.tarjeta || '',
+      cantidadCuotas: m.cantidadCuotas?.toString() || '1',
+      fechaPrimeraCuota: m.fechaPrimeraCuota || new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+      recurrente: m.recurrente || false,
+      esCuota: m.esCuota || false
     });
     setIsModalOpen(true);
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('¿Estás seguro de eliminar este movimiento?')) {
-      await deleteMovimiento(id);
+    const mov = movimientos.find(m => m.id === id);
+    if (!mov) return;
+
+    if (mov.compraId) {
+      if (window.confirm('Este movimiento pertenece a una compra financiada en cuotas. ¿Deseas eliminar TODAS las cuotas y el movimiento de referencia de esta compra?')) {
+        try {
+          const relacionados = movimientos.filter(m => m.compraId === mov.compraId);
+          const promesas = relacionados.map(r => deleteMovimiento(r.id));
+          await Promise.all(promesas);
+          alert('Compra financiada y todas sus cuotas eliminadas correctamente.');
+        } catch (error) {
+          console.error("Error al eliminar compra financiada:", error);
+          alert("Error al eliminar la compra financiada.");
+        }
+      }
+    } else {
+      if (window.confirm('¿Estás seguro de eliminar este movimiento?')) {
+        await deleteMovimiento(id);
+      }
     }
   };
 
@@ -76,12 +185,21 @@ const Movimientos = () => {
       descripcion: '',
       monto: '',
       responsable: '',
-      estado: 'pagado'
+      estado: 'pagado',
+      medioPago: 'Efectivo',
+      tarjeta: '',
+      cantidadCuotas: '1',
+      fechaPrimeraCuota: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+      recurrente: false,
+      esCuota: false
     });
   };
 
   const filteredMovimientos = movimientos.filter(m => {
     if (mes && !m.fecha.startsWith(mes)) return false;
+
+    // Excluir el movimiento de origen de compras financiadas para no duplicar el gasto
+    if (m.medioPago === 'Tarjeta' && m.cantidadCuotas > 1 && m.esCuota === false) return false;
 
     const search = searchTerm.toLowerCase();
     const categoriaNombre = categorias.find(c => c.id === m.categoriaId)?.nombre || '';
@@ -305,14 +423,104 @@ const Movimientos = () => {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Estado</label>
-            <select className="w-full p-2 border rounded-md bg-background" value={formData.estado} onChange={(e) => setFormData({...formData, estado: e.target.value})}>
-              <option value="pagado">Pagado</option>
-              <option value="pendiente">Pendiente</option>
-              <option value="proyectado">Proyectado</option>
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Medio de Pago</label>
+              <select 
+                className="w-full p-2 border rounded-md bg-background" 
+                required
+                disabled={editingId && formData.esCuota}
+                value={formData.medioPago || 'Efectivo'} 
+                onChange={(e) => setFormData({...formData, medioPago: e.target.value, tarjeta: '', cantidadCuotas: '1'})}
+              >
+                <option value="Efectivo">Efectivo</option>
+                <option value="Débito">Débito</option>
+                <option value="Transferencia">Transferencia</option>
+                <option value="Tarjeta">Tarjeta</option>
+                <option value="Billetera virtual">Billetera virtual</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Estado</label>
+              <select className="w-full p-2 border rounded-md bg-background" value={formData.estado} onChange={(e) => setFormData({...formData, estado: e.target.value})}>
+                <option value="pagado">Pagado</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="proyectado">Proyectado</option>
+              </select>
+            </div>
           </div>
+
+          {editingId && formData.esCuota && (
+            <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 font-medium">
+              ⚠️ Estás editando una cuota individual. Para cambiar la financiación completa, elimina esta compra y vuelve a cargarla.
+            </div>
+          )}
+
+          {formData.medioPago === 'Tarjeta' && formData.tipo === 'egreso' && !formData.esCuota && (
+            <div className="p-3 bg-indigo-50/40 border border-indigo-100 rounded-lg space-y-3">
+              <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Detalles de Tarjeta</p>
+              
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-slate-700">Nombre de la Tarjeta</label>
+                <input 
+                  type="text" 
+                  placeholder="Ej: Visa Cecilia, Amex Andres..." 
+                  className="w-full p-2 border rounded-md bg-background text-sm" 
+                  required={formData.medioPago === 'Tarjeta' && !formData.esCuota}
+                  value={formData.tarjeta || ''} 
+                  onChange={(e) => setFormData({...formData, tarjeta: e.target.value})} 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700">Cantidad de Cuotas</label>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    placeholder="1"
+                    className="w-full p-2 border rounded-md bg-background text-sm font-medium" 
+                    required={formData.medioPago === 'Tarjeta' && !formData.esCuota}
+                    value={formData.cantidadCuotas || '1'} 
+                    onChange={(e) => setFormData({...formData, cantidadCuotas: e.target.value})} 
+                  />
+                </div>
+                {Number(formData.cantidadCuotas) > 1 && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-700">Fecha 1er Vencimiento</label>
+                    <input 
+                      type="date" 
+                      className="w-full p-2 border rounded-md bg-background text-sm font-medium" 
+                      required={Number(formData.cantidadCuotas) > 1}
+                      value={formData.fechaPrimeraCuota || ''} 
+                      onChange={(e) => setFormData({...formData, fechaPrimeraCuota: e.target.value})} 
+                    />
+                  </div>
+                )}
+              </div>
+
+              {Number(formData.cantidadCuotas) > 1 && formData.monto && formData.fechaPrimeraCuota && (
+                <div className="p-2.5 bg-indigo-100/60 rounded-md text-xs text-indigo-900 font-medium">
+                  💡 Se generarán <span className="font-bold">{formData.cantidadCuotas}</span> cuotas de <span className="font-bold">${(Number(formData.monto) / Number(formData.cantidadCuotas)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> con primer vencimiento en <span className="font-bold">{new Date(formData.fechaPrimeraCuota + 'T00:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</span>.
+                </div>
+              )}
+            </div>
+          )}
+
+          {formData.tipo === 'egreso' && (formData.medioPago !== 'Tarjeta' || Number(formData.cantidadCuotas || 1) <= 1) && !formData.esCuota && (
+            <div className="flex items-center gap-2 py-1">
+              <input 
+                type="checkbox" 
+                id="recurrente" 
+                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                checked={formData.recurrente || false} 
+                onChange={(e) => setFormData({...formData, recurrente: e.target.checked})} 
+              />
+              <label htmlFor="recurrente" className="text-sm font-medium text-slate-700 cursor-pointer select-none">
+                ¿Es un gasto recurrente mensual? (Proyectar automáticamente en meses futuros)
+              </label>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4">
             <Button variant="outline" type="button" onClick={closeModal}>Cancelar</Button>

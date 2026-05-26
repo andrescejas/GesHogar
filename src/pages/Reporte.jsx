@@ -25,6 +25,8 @@ const Reporte = () => {
       if (mes && !m.fecha.startsWith(mes))              return false;
       if (filtroCategoria && m.categoriaId !== filtroCategoria) return false;
       if (filtroSubcategoria && m.subcategoriaId !== filtroSubcategoria) return false;
+      // Excluir el movimiento de origen de compras financiadas
+      if (m.medioPago === 'Tarjeta' && m.cantidadCuotas > 1 && m.esCuota === false) return false;
       return true;
     });
   }, [movimientos, mes, filtroCategoria, filtroSubcategoria]);
