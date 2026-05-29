@@ -7,7 +7,7 @@ import { useData } from '../context/DataContext';
 import { cn } from '../lib/utils';
 
 const Movimientos = () => {
-  const { movimientos, categorias, subcategorias, addMovimiento, updateMovimiento, deleteMovimiento, loading } = useData();
+  const { movimientos, categorias, subcategorias, tarjetas, addMovimiento, updateMovimiento, deleteMovimiento, loading } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -506,20 +506,6 @@ const Movimientos = () => {
                 </div>
               </div>
 
-              {formData.tipo === 'egreso' && (formData.medioPago !== 'Tarjeta' || Number(formData.cantidadCuotas || 1) <= 1) && !formData.esCuota && (
-                <div className="flex items-center gap-2 py-1">
-                  <input 
-                    type="checkbox" 
-                    id="recurrente" 
-                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                    checked={formData.recurrente || false} 
-                    onChange={(e) => setFormData({...formData, recurrente: e.target.checked})} 
-                  />
-                  <label htmlFor="recurrente" className="text-sm font-medium text-slate-700 cursor-pointer select-none">
-                    ¿Es un gasto recurrente mensual?
-                  </label>
-                </div>
-              )}
 
               {editingId && formData.esCuota && (
                 <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 font-medium">
@@ -537,14 +523,17 @@ const Movimientos = () => {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-700">Nombre de la Tarjeta</label>
-                  <input 
-                    type="text" 
-                    placeholder="Ej: Visa Cecilia, Amex Andres..." 
+                  <select 
                     className="w-full p-2 border rounded-md bg-background text-sm" 
                     required={formData.medioPago === 'Tarjeta' && !formData.esCuota}
                     value={formData.tarjeta || ''} 
                     onChange={(e) => setFormData({...formData, tarjeta: e.target.value})} 
-                  />
+                  >
+                    <option value="">Seleccionar tarjeta...</option>
+                    {tarjetas && tarjetas.filter(t => t.activa).map(t => (
+                      <option key={t.id} value={t.nombre}>{t.nombre}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="space-y-1.5">

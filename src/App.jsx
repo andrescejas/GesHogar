@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Movimientos from './pages/Movimientos';
 import Categorias from './pages/Categorias';
+import Tarjetas from './pages/Tarjetas';
 import Proyecciones from './pages/Proyecciones';
 import Comparativo from './pages/Comparativo';
 import Reporte from './pages/Reporte';
@@ -48,6 +49,7 @@ function App() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/movimientos" element={<Movimientos />} />
                 <Route path="/categorias" element={<Categorias />} />
+                <Route path="/tarjetas" element={<Tarjetas />} />
                 <Route path="/proyecciones" element={<Proyecciones />} />
                 <Route path="/comparativo" element={<Comparativo />} />
                 <Route path="/reporte" element={<Reporte />} />
