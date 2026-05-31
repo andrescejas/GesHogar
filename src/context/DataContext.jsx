@@ -1,4 +1,5 @@
-import { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
+import { generarMovimientosRecurrentes } from '../lib/generadorRecurrentes';
 import { db } from '../lib/firebase';
 import { 
   collection, 
@@ -105,6 +106,20 @@ export const DataProvider = ({ children }) => {
     await updateDoc(doc(db, 'proyecciones', id), datos);
   }, []);
 
+  const deleteProyeccion = useCallback(async (id) => await deleteDoc(doc(db, 'proyecciones', id)), []);
+
+  // Generador automático: cubre ventana mes actual + 3 meses sin duplicados
+  const generandoRef = useRef(false);
+  useEffect(() => {
+    if (loading) return;
+    if (generandoRef.current) return;
+    generandoRef.current = true;
+    generarMovimientosRecurrentes(proyecciones, movimientos, addMovimiento)
+      .catch(err => console.error('Error generando recurrentes:', err))
+      .finally(() => { generandoRef.current = false; });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proyecciones, movimientos, loading]);
+
   return (
     <DataContext.Provider value={{ 
       categorias, 
@@ -126,7 +141,8 @@ export const DataProvider = ({ children }) => {
       updateMovimiento,
       deleteMovimiento,
       saveProyeccion,
-      updateProyeccion
+      updateProyeccion,
+      deleteProyeccion
     }}>
       {children}
     </DataContext.Provider>

@@ -4,12 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { Button } from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import { useData } from '../context/DataContext';
-import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { cn } from '../lib/utils';
 
 const Proyecciones = () => {
-  const { categorias, subcategorias, proyecciones, movimientos, saveProyeccion, updateProyeccion, updateMovimiento } = useData();
+  const { categorias, subcategorias, proyecciones, movimientos, saveProyeccion, updateProyeccion, updateMovimiento, deleteProyeccion } = useData();
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -184,9 +182,9 @@ const Proyecciones = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('¿Eliminar esta proyección?')) {
+    if (window.confirm('¿Eliminar esta proyección? Los movimientos pendientes generados desde ella NO se eliminarán automáticamente.')) {
       setLoading(true);
-      await deleteDoc(doc(db, 'proyecciones', id));
+      await deleteProyeccion(id);
       setLoading(false);
     }
   };
@@ -197,15 +195,22 @@ const Proyecciones = () => {
     const mesAnterior = date.toISOString().substring(0, 7);
 
     setLoading(true);
-    const q = query(collection(db, 'proyecciones'), where('mes', '==', mesAnterior));
-    const snapshot = await getDocs(q);
+    // Solo duplica proyecciones únicas del mes anterior (las recurrentes se muestran solas)
+    const { collection: col, query: q2, where: w, getDocs: gd } = await import('firebase/firestore');
+    const { db: fireDb } = await import('../lib/firebase');
+    const snap = await gd(q2(col(fireDb, 'proyecciones'), w('mes', '==', mesAnterior)));
     
-    if (snapshot.empty) {
-      alert('No hay proyecciones en el mes anterior');
+    // SOLO duplicar Única — las recurrentes ya aparecen automáticamente por frecuencia
+    const unicasDocs = snap.empty ? [] : snap.docs.filter(docSnap => {
+      const freq = docSnap.data().frecuencia || 'Única';
+      return freq === 'Única';
+    });
+
+    if (unicasDocs.length === 0) {
+      alert('No hay proyecciones únicas en el mes anterior.\nLas recurrentes (Mensual, Anual, etc.) ya aparecen automáticamente.');
     } else {
-      const promises = snapshot.docs.map(docSnap => {
+      const promises = unicasDocs.map(docSnap => {
         const d = docSnap.data();
-        // Fallback para registros creados durante la transición de nombres de campos
         const subId = d.subcategoriaId || d.subcategoria || '';
         return saveProyeccion({
           mes,
@@ -215,16 +220,16 @@ const Proyecciones = () => {
           descripcion: d.descripcion || '',
           subcategoriaId: subId,
           responsable: d.responsable || '',
-          frecuencia: d.frecuencia || 'Única',
-          fechaInicio: d.fechaInicio || '',
-          fechaFin: d.fechaFin || '',
-          generarMovimientos: d.generarMovimientos || false,
-          estado: d.estado || 'Activa',
+          frecuencia: 'Única',
+          fechaInicio: '',
+          fechaFin: '',
+          generarMovimientos: false,
+          estado: 'Activa',
           medioPago: d.medioPago || 'Efectivo'
         });
       });
       await Promise.all(promises);
-      alert('Proyecciones duplicadas correctamente');
+      alert(`Se duplicaron ${unicasDocs.length} proyección(es) única(s).\nLas recurrentes ya están incluidas automáticamente.`);
     }
     setLoading(false);
   };
@@ -480,6 +485,90 @@ const Proyecciones = () => {
               value={formData.monto}
               onChange={(e) => setFormData({...formData, monto: e.target.value})}
             />
+          </div>
+
+          {/* Bloque Recurrencia */}
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3 space-y-3">
+            <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider">🔄 Recurrencia</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Frecuencia</label>
+                <select
+                  className="w-full p-2 border rounded-md bg-background text-sm"
+                  value={formData.frecuencia}
+                  onChange={(e) => setFormData({...formData, frecuencia: e.target.value, generarMovimientos: e.target.value !== 'Única' ? formData.generarMovimientos : false})}
+                >
+                  <option value="Única">Única (un mes)</option>
+                  <option value="Mensual">Mensual</option>
+                  <option value="Bimestral">Bimestral</option>
+                  <option value="Trimestral">Trimestral</option>
+                  <option value="Semestral">Semestral</option>
+                  <option value="Anual">Anual</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Estado</label>
+                <select
+                  className="w-full p-2 border rounded-md bg-background text-sm"
+                  value={formData.estado}
+                  onChange={(e) => setFormData({...formData, estado: e.target.value})}
+                >
+                  <option value="Activa">Activa</option>
+                  <option value="Inactiva">Inactiva (pausada)</option>
+                </select>
+              </div>
+            </div>
+
+            {formData.frecuencia !== 'Única' && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">Fecha Inicio</label>
+                    <input
+                      type="date"
+                      className="w-full p-2 border rounded-md bg-background text-sm"
+                      value={formData.fechaInicio}
+                      onChange={(e) => setFormData({...formData, fechaInicio: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">Fecha Fin (opcional)</label>
+                    <input
+                      type="date"
+                      className="w-full p-2 border rounded-md bg-background text-sm"
+                      value={formData.fechaFin}
+                      onChange={(e) => setFormData({...formData, fechaFin: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={formData.generarMovimientos}
+                      onChange={(e) => setFormData({...formData, generarMovimientos: e.target.checked})}
+                    />
+                    <div className="w-9 h-5 bg-slate-200 peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                  </label>
+                  <span className="text-xs font-medium">Generar movimientos automáticamente</span>
+                </div>
+              </>
+            )}
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium">Medio de Pago</label>
+              <select
+                className="w-full p-2 border rounded-md bg-background text-sm"
+                value={formData.medioPago}
+                onChange={(e) => setFormData({...formData, medioPago: e.target.value})}
+              >
+                <option value="Efectivo">Efectivo</option>
+                <option value="Débito">Débito</option>
+                <option value="Transferencia">Transferencia</option>
+                <option value="Billetera virtual">Billetera virtual</option>
+              </select>
+            </div>
           </div>
           <div className="flex justify-end gap-3 pt-4">
             <Button variant="outline" type="button" onClick={() => setIsModalOpen(false)}>Cancelar</Button>

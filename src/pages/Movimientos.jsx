@@ -25,8 +25,8 @@ const Movimientos = () => {
     tarjeta: '',
     cantidadCuotas: '1',
     fechaPrimeraCuota: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
-    recurrente: false,
-    esCuota: false
+    esCuota: false,
+    proyeccionId: null
   });
 
   const handleSubmit = async (e) => {
@@ -118,7 +118,6 @@ const Movimientos = () => {
         tarjeta: formData.medioPago === 'Tarjeta' ? formData.tarjeta : '',
         cantidadCuotas: formData.medioPago === 'Tarjeta' ? totalCuotas : 1,
         fechaPrimeraCuota: formData.medioPago === 'Tarjeta' ? formData.fechaPrimeraCuota : '',
-        recurrente: formData.tipo === 'egreso' ? (formData.recurrente || false) : false,
         esCuota: formData.esCuota || false,
         contabiliza: formData.esCuota === false && formData.medioPago === 'Tarjeta' ? false : (formData.contabiliza !== undefined ? formData.contabiliza : true),
         mes: formData.fecha.substring(0, 7)
@@ -148,8 +147,8 @@ const Movimientos = () => {
       tarjeta: m.tarjeta || '',
       cantidadCuotas: m.cantidadCuotas?.toString() || '1',
       fechaPrimeraCuota: m.fechaPrimeraCuota || new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
-      recurrente: m.recurrente || false,
-      esCuota: m.esCuota || false
+      esCuota: m.esCuota || false,
+      proyeccionId: m.proyeccionId || null
     });
     setIsModalOpen(true);
   };
@@ -193,8 +192,8 @@ const Movimientos = () => {
       tarjeta: '',
       cantidadCuotas: '1',
       fechaPrimeraCuota: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
-      recurrente: false,
-      esCuota: false
+      esCuota: false,
+      proyeccionId: null
     });
   };
 
@@ -389,7 +388,7 @@ const Movimientos = () => {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">Tipo</label>
-                  <select className="w-full p-2 border rounded-md bg-background text-sm" value={formData.tipo} onChange={(e) => setFormData({...formData, tipo: e.target.value})}>
+                  <select className="w-full p-2 border rounded-md bg-background text-sm" value={formData.tipo} onChange={(e) => setFormData({...formData, tipo: e.target.value})} disabled={!!formData.proyeccionId}>
                     <option value="ingreso">Ingreso</option>
                     <option value="egreso">Egreso</option>
                   </select>
@@ -403,6 +402,7 @@ const Movimientos = () => {
                   required 
                   value={formData.categoriaId} 
                   onChange={(e) => setFormData({...formData, categoriaId: e.target.value})}
+                  disabled={!!formData.proyeccionId}
                 >
                   <option value="">Seleccionar categoría...</option>
                   {categorias
@@ -421,7 +421,7 @@ const Movimientos = () => {
                   required
                   value={formData.subcategoriaId} 
                   onChange={(e) => setFormData({...formData, subcategoriaId: e.target.value})}
-                  disabled={!formData.categoriaId}
+                  disabled={!formData.categoriaId || !!formData.proyeccionId}
                 >
                   <option value="">Seleccionar subcategoría...</option>
                   {subcategorias
@@ -507,6 +507,11 @@ const Movimientos = () => {
               </div>
 
 
+              {editingId && formData.proyeccionId && (
+                <div className="p-2.5 bg-violet-50 border border-violet-200 rounded-md text-xs text-violet-800 font-medium">
+                  🔄 Movimiento generado automáticamente desde una proyección recurrente. Tipo, categoría y subcategoría no son editables.
+                </div>
+              )}
               {editingId && formData.esCuota && (
                 <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 font-medium">
                   ⚠️ Estás editando una cuota individual. Para cambiar la financiación completa, elimina esta compra y vuelve a cargarla.

@@ -3,6 +3,8 @@ import { useData } from '../context/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { cn } from '../lib/utils';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { proyeccionAplicaEnMes } from '../lib/generadorRecurrentes';
+
 
 const Comparativo = () => {
   const { categorias, subcategorias, movimientos, proyecciones } = useData();
@@ -16,13 +18,22 @@ const Comparativo = () => {
     const subDetails = subs.map(sub => {
       const isSinSub = sub.id === 'sin-sub';
       
+      // Proyectado físico: proyecciones únicas del mes O recurrentes que aplican en el mes
       const proyFisica = proyecciones
-        .filter(p => p.categoriaId === cat.id && p.mes === mes && (isSinSub ? !p.subcategoriaId : p.subcategoriaId === sub.id))
+        .filter(p => {
+          const matchCat = p.categoriaId === cat.id;
+          const matchSub = isSinSub ? !p.subcategoriaId : p.subcategoriaId === sub.id;
+          if (!matchCat || !matchSub) return false;
+          const freq = p.frecuencia || 'Única';
+          if (freq === 'Única') return p.mes === mes;
+          return proyeccionAplicaEnMes(p, mes);
+        })
         .reduce((acc, p) => acc + (Number(p.montoProyectado) || 0), 0);
         
       let proy = proyFisica;
 
       if (cat.tipo === 'egreso') {
+        // Cuotas de tarjeta
         const cuotasProy = movimientos
           .filter(m => 
             m.esCuota === true && 
@@ -33,24 +44,15 @@ const Comparativo = () => {
           )
           .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
 
-        const recurrentesProy = movimientos
-          .filter(m => 
-            m.recurrente === true && 
-            m.fecha.substring(0, 7) <= mes && 
-            m.categoriaId === cat.id && 
-            (isSinSub ? !m.subcategoriaId : m.subcategoriaId === sub.id) &&
-            m.contabiliza !== false
-          )
-          .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
-
-        proy = proyFisica + cuotasProy + recurrentesProy;
+        proy = proyFisica + cuotasProy;
       }
         
+      // Real: SOLO movimientos en estado 'pagado'
       const real = movimientos
         .filter(m => 
           (m.categoriaId === cat.id || m.categoria === cat.nombre) && 
           m.fecha.startsWith(mes) && 
-          m.estado !== 'proyectado' && 
+          m.estado === 'pagado' && 
           (isSinSub ? !m.subcategoriaId : m.subcategoriaId === sub.id) &&
           m.contabiliza !== false
         )
