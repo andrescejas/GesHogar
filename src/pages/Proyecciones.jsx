@@ -197,20 +197,40 @@ const Proyecciones = () => {
     const mesAnterior = date.toISOString().substring(0, 7);
 
     setLoading(true);
-    // Solo duplica proyecciones únicas del mes anterior (las recurrentes se muestran solas)
-    const snap = await getDocs(query(collection(db, 'proyecciones'), where('mes', '==', mesAnterior)));
-    
-    // SOLO duplicar Única — las recurrentes ya aparecen automáticamente por frecuencia
-    const unicasDocs = snap.empty ? [] : snap.docs.filter(docSnap => {
-      const freq = docSnap.data().frecuencia || 'Única';
-      return freq === 'Única';
-    });
+    try {
+      const snap = await getDocs(query(collection(db, 'proyecciones'), where('mes', '==', mesAnterior)));
+      const unicas = snap.empty ? [] : snap.docs
+        .map(docSnap => docSnap.data())
+        .filter(d => (d.frecuencia || 'Única') === 'Única');
 
-    if (unicasDocs.length === 0) {
-      alert('No hay proyecciones únicas en el mes anterior.\nLas recurrentes (Mensual, Anual, etc.) ya aparecen automáticamente.');
-    } else {
-      const promises = unicasDocs.map(docSnap => {
-        const d = docSnap.data();
+      if (unicas.length === 0) {
+        alert('No hay proyecciones únicas en el mes anterior.\nLas recurrentes (Mensual, Anual, etc.) ya aparecen automáticamente.');
+        return;
+      }
+
+      const existentesMesActual = proyecciones.filter(p =>
+        p.mes === mes &&
+        (p.frecuencia || 'Única') === 'Única'
+      );
+
+      const esMismaProyeccion = (base, existente) => {
+        const subBase = base.subcategoriaId || base.subcategoria || '';
+        const subExistente = existente.subcategoriaId || existente.subcategoria || '';
+
+        return (
+          base.categoriaId === existente.categoriaId &&
+          subBase === subExistente &&
+          (base.tipo || '') === (existente.tipo || '') &&
+          (base.descripcion || '') === (existente.descripcion || '') &&
+          (base.responsable || '') === (existente.responsable || '')
+        );
+      };
+
+      const aDuplicar = unicas.filter(d =>
+        !existentesMesActual.some(existente => esMismaProyeccion(d, existente))
+      );
+
+      const promises = aDuplicar.map(d => {
         const subId = d.subcategoriaId || d.subcategoria || '';
         return saveProyeccion({
           mes,
@@ -228,10 +248,17 @@ const Proyecciones = () => {
           medioPago: d.medioPago || 'Efectivo'
         });
       });
+
       await Promise.all(promises);
-      alert(`Se duplicaron ${unicasDocs.length} proyección(es) única(s).\nLas recurrentes ya están incluidas automáticamente.`);
+
+      const omitidas = unicas.length - aDuplicar.length;
+      alert(`Se duplicaron ${aDuplicar.length} proyección(es) única(s).${omitidas > 0 ? `\nSe omitieron ${omitidas} porque ya existían en ${mes}.` : ''}\nLas recurrentes ya están incluidas automáticamente.`);
+    } catch (error) {
+      console.error('Error duplicando mes anterior:', error);
+      alert('No se pudo duplicar el mes anterior: ' + error.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const renderTable = (tipo) => {
