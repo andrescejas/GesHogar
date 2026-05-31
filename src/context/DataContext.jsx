@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { db } from '../lib/firebase';
 import { 
   collection, 
@@ -8,9 +8,7 @@ import {
   doc, 
   onSnapshot,
   query,
-  orderBy,
-  where,
-  getDocs
+  orderBy
 } from 'firebase/firestore';
 
 const DataContext = createContext();
@@ -95,15 +93,10 @@ export const DataProvider = ({ children }) => {
   const deleteMovimiento = useCallback(async (id) => await deleteDoc(doc(db, 'movimientos', id)), []);
 
   // CRUD Proyecciones
-  const saveProyeccion = useCallback(async (mes, categoriaId, monto, tipo, descripcion = '', subcategoriaId = '', responsable = '') => {
+  const saveProyeccion = useCallback(async (datos) => {
     await addDoc(collection(db, 'proyecciones'), {
-      mes,
-      categoriaId,
-      montoProyectado: Number(monto),
-      tipo,
-      descripcion,
-      subcategoriaId,
-      responsable
+      ...datos,
+      montoProyectado: Number(datos.montoProyectado || datos.monto || 0),
     });
   }, []);
 
@@ -140,4 +133,5 @@ export const DataProvider = ({ children }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useData = () => useContext(DataContext);

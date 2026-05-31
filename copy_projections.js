@@ -41,11 +41,6 @@ function fromFirestore(doc) {
   return obj;
 }
 
-async function firestoreGet(path) {
-  const res = await fetch(`${BASE_URL}/${path}?key=${API_KEY}`);
-  return res.json();
-}
-
 async function firestoreQuery(collection, field, value) {
   const body = {
     structuredQuery: {

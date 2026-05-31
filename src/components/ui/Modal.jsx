@@ -1,7 +1,5 @@
-import React from 'react';
 import { X } from 'lucide-react';
 import { Button } from './Button';
-import { cn } from '../../lib/utils';
 
 const Modal = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;

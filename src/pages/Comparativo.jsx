@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { Fragment, useState } from 'react';
 import { useData } from '../context/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { cn } from '../lib/utils';
-import { ArrowUpRight, ArrowDownRight, Minus, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
 
 const Comparativo = () => {
   const { categorias, subcategorias, movimientos, proyecciones } = useData();
@@ -109,13 +107,7 @@ const Comparativo = () => {
         />
       </div>
 
-      {false ? (
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          <Loader2 className="h-8 w-8 animate-spin mr-2" />
-          Calculando comparativa...
-        </div>
-      ) : (
-        <>
+      <>
           <div className="grid gap-4 md:grid-cols-3">
             <ResumenCard 
               title="Ahorro Real" 
@@ -161,7 +153,7 @@ const Comparativo = () => {
                   </thead>
                   <tbody className="[&_tr:last-child]:border-0">
                     {comparativa.map((c) => (
-                      <React.Fragment key={c.id}>
+                      <Fragment key={c.id}>
                         <tr className="border-b transition-colors bg-muted/20">
                           <td className="p-4 align-middle">
                             <div className="flex flex-col">
@@ -216,15 +208,14 @@ const Comparativo = () => {
                             </td>
                           </tr>
                         ))}
-                      </React.Fragment>
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
               </div>
             </CardContent>
           </Card>
-        </>
-      )}
+      </>
     </div>
   );
 };

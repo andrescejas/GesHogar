@@ -1,10 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, Edit, Trash2, Search, CreditCard } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import { useData } from '../context/DataContext';
-import { cn } from '../lib/utils';
 
 const Tarjetas = () => {
   const { tarjetas, addTarjeta, updateTarjeta, deleteTarjeta } = useData();

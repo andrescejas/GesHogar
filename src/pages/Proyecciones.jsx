@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Copy, Save, Loader2, Plus, Trash2, Edit, Search } from 'lucide-react';
+import { Fragment, useMemo, useState } from 'react';
+import { Copy, Plus, Trash2, Edit, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
@@ -9,7 +9,7 @@ import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/fire
 import { cn } from '../lib/utils';
 
 const Proyecciones = () => {
-  const { categorias, subcategorias, proyecciones, movimientos, saveProyeccion, updateProyeccion, loading: contextLoading } = useData();
+  const { categorias, subcategorias, proyecciones, movimientos, saveProyeccion, updateProyeccion, updateMovimiento } = useData();
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,10 +21,40 @@ const Proyecciones = () => {
     descripcion: '',
     responsable: '',
     monto: '',
+    frecuencia: 'Única',
+    fechaInicio: new Date().toISOString().substring(0, 10),
+    fechaFin: '',
+    generarMovimientos: false,
+    estado: 'Activa',
+    medioPago: 'Efectivo'
   });
 
-  const proyeccionesList = React.useMemo(() => {
-    const proManuales = proyecciones.filter(p => p.mes === mes);
+  const proyeccionesList = useMemo(() => {
+    const proManuales = proyecciones.filter(p => {
+      const freq = p.frecuencia || 'Única';
+      if (freq === 'Única') {
+        return p.mes === mes;
+      }
+
+      const startMonth = p.fechaInicio ? p.fechaInicio.substring(0, 7) : p.mes;
+      const endMonth = p.fechaFin ? p.fechaFin.substring(0, 7) : null;
+      
+      if (mes < startMonth) return false;
+      if (endMonth && mes > endMonth) return false;
+
+      const dStart = new Date(startMonth + '-01');
+      const dCurrent = new Date(mes + '-01');
+      const diffMonths = (dCurrent.getFullYear() - dStart.getFullYear()) * 12 + (dCurrent.getMonth() - dStart.getMonth());
+
+      switch(freq) {
+        case 'Mensual': return true;
+        case 'Bimestral': return diffMonths % 2 === 0;
+        case 'Trimestral': return diffMonths % 3 === 0;
+        case 'Semestral': return diffMonths % 6 === 0;
+        case 'Anual': return diffMonths % 12 === 0;
+        default: return false;
+      }
+    });
     
     const proysVirtualesCuotas = (movimientos || [])
       .filter(m => m.esCuota === true && m.fecha.startsWith(mes) && m.tipo === 'egreso' && m.contabiliza !== false)
@@ -40,21 +70,7 @@ const Proyecciones = () => {
         virtualType: 'Tarjeta'
       }));
 
-    const proysVirtualesRecurrentes = (movimientos || [])
-      .filter(m => m.recurrente === true && m.fecha.substring(0, 7) <= mes && m.tipo === 'egreso' && m.contabiliza !== false)
-      .map(m => ({
-        id: `virtual-recurrente-${m.id}`,
-        categoriaId: m.categoriaId,
-        subcategoriaId: m.subcategoriaId,
-        montoProyectado: Number(m.monto),
-        tipo: 'egreso',
-        descripcion: `${m.descripcion} (Recurrente)`,
-        responsable: m.responsable,
-        isVirtual: true,
-        virtualType: 'Recurrente'
-      }));
-
-    return [...proManuales, ...proysVirtualesCuotas, ...proysVirtualesRecurrentes];
+    return [...proManuales, ...proysVirtualesCuotas];
   }, [proyecciones, movimientos, mes]);
 
   const handleOpenModal = (proyeccion = null) => {
@@ -66,9 +82,28 @@ const Proyecciones = () => {
         descripcion: proyeccion.descripcion || '',
         responsable: proyeccion.responsable || '',
         monto: proyeccion.montoProyectado.toString(),
+        frecuencia: proyeccion.frecuencia || 'Única',
+        fechaInicio: proyeccion.fechaInicio || new Date().toISOString().substring(0, 10),
+        fechaFin: proyeccion.fechaFin || '',
+        generarMovimientos: proyeccion.generarMovimientos || false,
+        estado: proyeccion.estado || 'Activa',
+        medioPago: proyeccion.medioPago || 'Efectivo'
       });
     } else {
-      setFormData({ id: null, categoriaId: '', subcategoriaId: '', descripcion: '', responsable: '', monto: '' });
+      setFormData({ 
+        id: null, 
+        categoriaId: '', 
+        subcategoriaId: '', 
+        descripcion: '', 
+        responsable: '', 
+        monto: '',
+        frecuencia: 'Única',
+        fechaInicio: new Date(mes + '-01T12:00:00').toISOString().substring(0, 10),
+        fechaFin: '',
+        generarMovimientos: false,
+        estado: 'Activa',
+        medioPago: 'Efectivo'
+      });
     }
     setIsModalOpen(true);
   };
@@ -91,20 +126,54 @@ const Proyecciones = () => {
       }
 
       if (formData.id) {
+        let updateFuture = false;
+        if (formData.frecuencia !== 'Única' && formData.generarMovimientos) {
+          updateFuture = window.confirm("¿Deseás actualizar también los movimientos futuros pendientes generados desde esta proyección?");
+        }
+
         await updateProyeccion(formData.id, {
           categoriaId: formData.categoriaId,
           subcategoriaId: formData.subcategoriaId,
           montoProyectado: Number(formData.monto),
           tipo: cat.tipo,
           descripcion: formData.descripcion,
-          responsable: formData.responsable
+          responsable: formData.responsable,
+          frecuencia: formData.frecuencia,
+          fechaInicio: formData.fechaInicio,
+          fechaFin: formData.fechaFin,
+          generarMovimientos: formData.generarMovimientos,
+          estado: formData.estado,
+          medioPago: formData.medioPago
         });
+
+        if (updateFuture) {
+          const futureMovs = (movimientos || []).filter(m => m.proyeccionId === formData.id && m.estado === 'pendiente' && m.fecha >= formData.fechaInicio);
+          const promises = futureMovs.map(m => updateMovimiento(m.id, { monto: Number(formData.monto) }));
+          await Promise.all(promises);
+        }
       } else {
-        await saveProyeccion(mes, formData.categoriaId, formData.monto, cat.tipo, formData.descripcion, formData.subcategoriaId, formData.responsable);
+        await saveProyeccion({
+          mes, 
+          categoriaId: formData.categoriaId, 
+          monto: formData.monto, 
+          tipo: cat.tipo, 
+          descripcion: formData.descripcion, 
+          subcategoriaId: formData.subcategoriaId, 
+          responsable: formData.responsable,
+          frecuencia: formData.frecuencia,
+          fechaInicio: formData.fechaInicio,
+          fechaFin: formData.fechaFin,
+          generarMovimientos: formData.generarMovimientos,
+          estado: formData.estado,
+          medioPago: formData.medioPago
+        });
       }
       
       setIsModalOpen(false);
-      setFormData({ id: null, categoriaId: '', monto: '', descripcion: '' });
+      setFormData({ 
+        id: null, categoriaId: '', subcategoriaId: '', descripcion: '', responsable: '', monto: '',
+        frecuencia: 'Única', fechaInicio: new Date().toISOString().substring(0, 10), fechaFin: '', generarMovimientos: false, estado: 'Activa', medioPago: 'Efectivo'
+      });
       alert('Proyección guardada correctamente');
     } catch (error) {
       console.error("Error al guardar:", error);
@@ -138,7 +207,21 @@ const Proyecciones = () => {
         const d = docSnap.data();
         // Fallback para registros creados durante la transición de nombres de campos
         const subId = d.subcategoriaId || d.subcategoria || '';
-        return saveProyeccion(mes, d.categoriaId, d.montoProyectado, d.tipo, d.descripcion || '', subId, d.responsable || '');
+        return saveProyeccion({
+          mes,
+          categoriaId: d.categoriaId,
+          montoProyectado: d.montoProyectado,
+          tipo: d.tipo,
+          descripcion: d.descripcion || '',
+          subcategoriaId: subId,
+          responsable: d.responsable || '',
+          frecuencia: d.frecuencia || 'Única',
+          fechaInicio: d.fechaInicio || '',
+          fechaFin: d.fechaFin || '',
+          generarMovimientos: d.generarMovimientos || false,
+          estado: d.estado || 'Activa',
+          medioPago: d.medioPago || 'Efectivo'
+        });
       });
       await Promise.all(promises);
       alert('Proyecciones duplicadas correctamente');
@@ -189,7 +272,7 @@ const Proyecciones = () => {
                 const cat = categorias.find(c => c.id === catId);
                 const items = grouped[catId];
                 return (
-                  <React.Fragment key={catId}>
+                  <Fragment key={catId}>
                     <tr className="bg-muted/30">
                       <td colSpan="5" className="p-2 font-bold text-sm">
                         {cat?.icono || '📁'} {cat?.nombre || 'Categoría desconocida'}
@@ -235,7 +318,7 @@ const Proyecciones = () => {
                         </td>
                       </tr>
                     ))}
-                  </React.Fragment>
+                  </Fragment>
                 );
               })
             )}

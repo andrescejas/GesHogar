@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Search, MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import Modal from '../components/ui/Modal';

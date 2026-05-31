@@ -1,4 +1,3 @@
-import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { X, LayoutDashboard, ReceiptText, Tags, LineChart, Scale, FileText, CreditCard } from 'lucide-react';
 import { cn } from '../lib/utils';

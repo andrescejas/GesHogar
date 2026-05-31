@@ -21,7 +21,8 @@ async function run() {
     const nuevaFecha = mov.fecha.replace('2026-05', '2026-04');
     
     // Clonar la data sin el id original
-    const { id, ...data } = mov;
+    const data = { ...mov };
+    delete data.id;
     const newData = { ...data, fecha: nuevaFecha };
     
     await addDoc(collection(db, 'movimientos'), newData);

@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Plus, Edit, Trash2, Search, ArrowUpDown } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Plus, Edit, Trash2, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
@@ -232,7 +232,7 @@ const Categorias = () => {
               <CardContent className="p-0">
                 {cat.subs.length === 0 ? (
                   <div className="p-4 pl-6 text-sm text-slate-400 italic">
-                    Sin subcategorías asociadas. Usa el botón "+" para agregar una.
+                    Sin subcategorías asociadas. Usa el botón &quot;+&quot; para agregar una.
                   </div>
                 ) : (
                   <div className="w-full overflow-auto">
