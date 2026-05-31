@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { X, LayoutDashboard, ReceiptText, Tags, LineChart, Scale, FileText, CreditCard } from 'lucide-react';
+import { X, LayoutDashboard, ReceiptText, Tags, LineChart, Scale, FileText, CreditCard, Settings } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const Sidebar = ({ onClose }) => {
@@ -11,6 +11,7 @@ const Sidebar = ({ onClose }) => {
     { name: 'Proyecciones', icon: LineChart, path: '/proyecciones' },
     { name: 'Comparativo', icon: Scale, path: '/comparativo' },
     { name: 'Reporte', icon: FileText, path: '/reporte' },
+    { name: 'Configuración', icon: Settings, path: '/configuracion' },
   ];
 
   return (

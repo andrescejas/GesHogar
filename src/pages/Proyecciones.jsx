@@ -1,9 +1,11 @@
 import { Fragment, useMemo, useState } from 'react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { Copy, Plus, Trash2, Edit, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import { useData } from '../context/DataContext';
+import { db } from '../lib/firebase';
 import { cn } from '../lib/utils';
 
 const Proyecciones = () => {
@@ -196,9 +198,7 @@ const Proyecciones = () => {
 
     setLoading(true);
     // Solo duplica proyecciones únicas del mes anterior (las recurrentes se muestran solas)
-    const { collection: col, query: q2, where: w, getDocs: gd } = await import('firebase/firestore');
-    const { db: fireDb } = await import('../lib/firebase');
-    const snap = await gd(q2(col(fireDb, 'proyecciones'), w('mes', '==', mesAnterior)));
+    const snap = await getDocs(query(collection(db, 'proyecciones'), where('mes', '==', mesAnterior)));
     
     // SOLO duplicar Única — las recurrentes ya aparecen automáticamente por frecuencia
     const unicasDocs = snap.empty ? [] : snap.docs.filter(docSnap => {
@@ -418,8 +418,11 @@ const Proyecciones = () => {
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         title={formData.id ? "Editar Proyección" : "Agregar Proyección"}
+        maxWidth="max-w-4xl"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-start">
+          <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Categoría</label>
             <select 
@@ -488,7 +491,8 @@ const Proyecciones = () => {
           </div>
 
           {/* Bloque Recurrencia */}
-          <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3 space-y-3">
+          </div>
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3 lg:sticky lg:top-0">
             <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider">🔄 Recurrencia</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -569,6 +573,7 @@ const Proyecciones = () => {
                 <option value="Billetera virtual">Billetera virtual</option>
               </select>
             </div>
+          </div>
           </div>
           <div className="flex justify-end gap-3 pt-4">
             <Button variant="outline" type="button" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
