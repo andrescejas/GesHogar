@@ -142,7 +142,7 @@ const Movimientos = () => {
       descripcion: m.descripcion || '',
       monto: m.monto,
       responsable: m.responsable || '',
-      estado: m.estado,
+      estado: m.estado === 'proyectado' ? 'pendiente' : m.estado,
       medioPago: m.medioPago || 'Efectivo',
       tarjeta: m.tarjeta || '',
       cantidadCuotas: m.cantidadCuotas?.toString() || '1',
@@ -501,7 +501,6 @@ const Movimientos = () => {
                   >
                     <option value="pagado">Pagado</option>
                     <option value="pendiente">Pendiente</option>
-                    <option value="proyectado">Proyectado</option>
                   </select>
                 </div>
               </div>
