@@ -30,6 +30,7 @@ npm.cmd run dev
 - `npm run build`: genera el build de producción en `dist/`.
 - `npm run lint`: corre ESLint.
 - `npm run preview`: sirve el build generado.
+- `npm run backup`: exporta las colecciones de Firestore a `backups/`.
 
 ## Modulos principales
 
@@ -51,3 +52,13 @@ La app sincroniza en tiempo real con Firestore usando las colecciones:
 - `tarjetas`
 - `movimientos`
 - `proyecciones`
+
+## Backup
+
+Para generar una copia local de contingencia:
+
+```bash
+npm run backup
+```
+
+El archivo se crea en `backups/backup-<timestamp>.json`. La carpeta `backups/` está ignorada por Git para no subir datos personales al repositorio.
