@@ -7,8 +7,9 @@ import { useData } from '../context/DataContext';
 import { cn } from '../lib/utils';
 
 const Movimientos = () => {
-  const { movimientos, categorias, subcategorias, tarjetas, addMovimiento, updateMovimiento, deleteMovimiento, loading } = useData();
+  const { movimientos, categorias, subcategorias, tarjetas, proyecciones, addMovimiento, updateMovimiento, deleteMovimiento, saveProyeccion, updateProyeccion, deleteProyeccion, loading } = useData();
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterTarjeta, setFilterTarjeta] = useState('');
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -26,8 +27,49 @@ const Movimientos = () => {
     cantidadCuotas: '1',
     fechaPrimeraCuota: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
     esCuota: false,
-    proyeccionId: null
+    proyeccionId: null,
+    frecuencia: 'Única',
+    estadoRecurrencia: 'Activa',
+    fechaInicioProyeccion: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0]
   });
+
+  const mediosConTarjeta = ['Tarjeta', 'Débito', 'Débito automático'];
+  const usaTarjeta = (medioPago) => mediosConTarjeta.includes(medioPago);
+
+  const getTarjeta = (valor) => {
+    if (!valor) return null;
+    return tarjetas.find(t => t.id === valor) ||
+      tarjetas.find(t => t.nombre?.toLowerCase().trim() === valor.toLowerCase().trim()) ||
+      null;
+  };
+
+  const sumarMeses = (fecha, cantidadMeses) => {
+    const date = new Date(`${fecha}T00:00:00`);
+    date.setMonth(date.getMonth() + cantidadMeses);
+    return date.toISOString().split('T')[0];
+  };
+
+  const getIntervaloMeses = (frecuencia) => {
+    switch (frecuencia) {
+      case 'Bimestral': return 2;
+      case 'Trimestral': return 3;
+      case 'Semestral': return 6;
+      case 'Anual': return 12;
+      default: return 1;
+    }
+  };
+
+  const getFechaInicioProyeccion = (fechaMovimiento, fechaElegida, frecuencia) => {
+    let fechaInicio = fechaElegida || fechaMovimiento;
+    const mesMovimiento = fechaMovimiento.substring(0, 7);
+    const intervalo = getIntervaloMeses(frecuencia);
+
+    while (fechaInicio.substring(0, 7) <= mesMovimiento) {
+      fechaInicio = sumarMeses(fechaInicio, intervalo);
+    }
+
+    return fechaInicio;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,7 +82,8 @@ const Movimientos = () => {
     const totalCuotas = Number(formData.cantidadCuotas || 1);
 
     // Lógica para registrar nueva compra financiada o en 1 cuota con Tarjeta
-    if (!editingId && formData.medioPago === 'Tarjeta' && formData.tipo === 'egreso') {
+    // No aplica a movimientos generados desde proyecciones
+    if (!editingId && formData.medioPago === 'Tarjeta' && formData.tipo === 'egreso' && !formData.proyeccionId) {
       try {
         const dataOriginal = {
           fecha: formData.fecha,
@@ -81,7 +124,7 @@ const Movimientos = () => {
             categoriaId: formData.categoriaId,
             subcategoriaId: formData.subcategoriaId,
             responsable: formData.responsable || '',
-            descripcion: totalCuotas > 1 ? `${formData.descripcion} (Cuota ${i}/${totalCuotas})` : `${formData.descripcion} (Cuota única)`,
+            descripcion: totalCuotas > 1 ? `${formData.descripcion} (Cuota ${i}/${totalCuotas})` : `${formData.descripcion} (Cuota Única)`,
             monto: cuotaMonto,
             fecha: cuotaFecha,
             mes: cuotaMes,
@@ -115,24 +158,67 @@ const Movimientos = () => {
         responsable: formData.responsable || '',
         estado: formData.estado,
         medioPago: formData.medioPago || 'Efectivo',
-        tarjeta: formData.medioPago === 'Tarjeta' ? formData.tarjeta : '',
-        cantidadCuotas: formData.medioPago === 'Tarjeta' ? totalCuotas : 1,
-        fechaPrimeraCuota: formData.medioPago === 'Tarjeta' ? formData.fechaPrimeraCuota : '',
+        tarjeta: usaTarjeta(formData.medioPago) ? formData.tarjeta : '',
+        cantidadCuotas: (formData.medioPago === 'Tarjeta' && !formData.proyeccionId) ? totalCuotas : 1,
+        fechaPrimeraCuota: (formData.medioPago === 'Tarjeta' && !formData.proyeccionId) ? formData.fechaPrimeraCuota : '',
         esCuota: formData.esCuota || false,
-        contabiliza: formData.esCuota === false && formData.medioPago === 'Tarjeta' ? false : (formData.contabiliza !== undefined ? formData.contabiliza : true),
+        contabiliza: (formData.esCuota === false && formData.medioPago === 'Tarjeta' && !formData.proyeccionId) ? false : (formData.contabiliza !== undefined ? formData.contabiliza : true),
         mes: formData.fecha.substring(0, 7)
       };
 
       if (editingId) {
         await updateMovimiento(editingId, data);
+        if (formData.proyeccionId) {
+          await updateProyeccion(formData.proyeccionId, {
+            frecuencia: formData.frecuencia,
+            fechaInicio: formData.fechaInicioProyeccion,
+            generarMovimientos: formData.frecuencia !== 'Única' && formData.frecuencia !== 'Única (un mes)',
+            estado: formData.estadoRecurrencia || 'Activa',
+            medioPago: formData.medioPago || 'Efectivo',
+            tarjeta: usaTarjeta(formData.medioPago) ? formData.tarjeta : ''
+          });
+        }
       } else {
         await addMovimiento(data);
+      }
+    }
+
+    if (!editingId && formData.tipo === 'egreso' && formData.frecuencia && formData.frecuencia !== 'Única' && formData.frecuencia !== 'Única (un mes)') {
+      try {
+        const fechaInicioProyeccion = getFechaInicioProyeccion(
+          formData.fecha,
+          formData.fechaInicioProyeccion,
+          formData.frecuencia
+        );
+
+        await saveProyeccion({
+          mes: fechaInicioProyeccion.substring(0, 7),
+          categoriaId: formData.categoriaId,
+          subcategoriaId: formData.subcategoriaId,
+          montoProyectado: Number(formData.monto),
+          tipo: 'egreso',
+          descripcion: formData.descripcion,
+          responsable: formData.responsable || '',
+          frecuencia: formData.frecuencia,
+          fechaInicio: fechaInicioProyeccion,
+          fechaFin: '',
+          generarMovimientos: true, // Auto generar a futuro
+          estado: formData.estadoRecurrencia || 'Activa',
+          medioPago: formData.medioPago || 'Efectivo',
+          tarjeta: usaTarjeta(formData.medioPago) ? formData.tarjeta : ''
+        });
+      } catch (err) {
+        console.error("Error al crear la proyección automática:", err);
       }
     }
     closeModal();
   };
 
   const handleEdit = (m) => {
+    const proyeccion = m.proyeccionId
+      ? proyecciones.find(p => p.id === m.proyeccionId)
+      : null;
+
     setEditingId(m.id);
     setFormData({
       fecha: m.fecha,
@@ -148,7 +234,10 @@ const Movimientos = () => {
       cantidadCuotas: m.cantidadCuotas?.toString() || '1',
       fechaPrimeraCuota: m.fechaPrimeraCuota || new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
       esCuota: m.esCuota || false,
-      proyeccionId: m.proyeccionId || null
+      proyeccionId: m.proyeccionId || null,
+      frecuencia: proyeccion?.frecuencia || 'Única',
+      estadoRecurrencia: proyeccion?.estado || 'Activa',
+      fechaInicioProyeccion: proyeccion?.fechaInicio || m.fecha || new Date().toISOString().split('T')[0]
     });
     setIsModalOpen(true);
   };
@@ -157,7 +246,22 @@ const Movimientos = () => {
     const mov = movimientos.find(m => m.id === id);
     if (!mov) return;
 
-    if (mov.compraId) {
+    if (mov.proyeccionId) {
+      if (window.confirm('Este movimiento se genera automaticamente desde una proyeccion recurrente. Si solo se elimina el movimiento, volvera a aparecer. Deseas eliminar tambien la recurrencia y sus movimientos pendientes?')) {
+        try {
+          const relacionadosPendientes = movimientos.filter(m =>
+            m.proyeccionId === mov.proyeccionId &&
+            (m.estado === 'pendiente' || m.id === mov.id)
+          );
+          await Promise.all(relacionadosPendientes.map(r => deleteMovimiento(r.id)));
+          await deleteProyeccion(mov.proyeccionId);
+          alert('Recurrencia y movimientos pendientes eliminados correctamente.');
+        } catch (error) {
+          console.error("Error al eliminar recurrencia:", error);
+          alert("Error al eliminar la recurrencia.");
+        }
+      }
+    } else if (mov.compraId) {
       if (window.confirm('Este movimiento pertenece a una compra financiada en cuotas. ¿Deseas eliminar TODAS las cuotas y el movimiento de referencia de esta compra?')) {
         try {
           const relacionados = movimientos.filter(m => m.compraId === mov.compraId);
@@ -193,12 +297,16 @@ const Movimientos = () => {
       cantidadCuotas: '1',
       fechaPrimeraCuota: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
       esCuota: false,
-      proyeccionId: null
+      proyeccionId: null,
+      frecuencia: 'Única',
+      estadoRecurrencia: 'Activa',
+      fechaInicioProyeccion: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0]
     });
   };
 
   const filteredMovimientos = movimientos.filter(m => {
     if (mes && !m.fecha.startsWith(mes)) return false;
+    if (filterTarjeta && getTarjeta(m.tarjeta)?.id !== filterTarjeta) return false;
 
     const search = searchTerm.toLowerCase();
     const categoriaNombre = categorias.find(c => c.id === m.categoriaId)?.nombre || '';
@@ -217,6 +325,9 @@ const Movimientos = () => {
   const totalIngresos = filteredMovimientos.filter(m => m.tipo === 'ingreso').reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
   const totalEgresos = filteredMovimientos.filter(m => m.tipo === 'egreso' && m.contabiliza !== false).reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
   const saldo = totalIngresos - totalEgresos;
+  const showTarjetaPanel = formData.medioPago === 'Tarjeta' && formData.tipo === 'egreso' && !formData.esCuota && !formData.proyeccionId;
+  const showRecurrenciaPanel = (!editingId || formData.proyeccionId) && formData.tipo === 'egreso' && (formData.medioPago !== 'Tarjeta' || formData.proyeccionId);
+  const showRightPanel = showTarjetaPanel || showRecurrenciaPanel;
 
   if (loading) return <div className="flex items-center justify-center h-full">Cargando...</div>;
 
@@ -258,6 +369,16 @@ const Movimientos = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <CardTitle>Historial de Transacciones</CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
+              <select
+                className="p-2 border rounded-md bg-background text-sm font-medium"
+                value={filterTarjeta}
+                onChange={(e) => setFilterTarjeta(e.target.value)}
+              >
+                <option value="">Todas las tarjetas</option>
+                {tarjetas.filter(t => t.activa).map(t => (
+                  <option key={t.id} value={t.id}>{t.nombre}</option>
+                ))}
+              </select>
               <input 
                 type="month" 
                 className="p-2 border rounded-md bg-background text-sm font-medium"
@@ -310,6 +431,11 @@ const Movimientos = () => {
                             {m.medioPago}
                           </span>
                         )}
+                        {(m.proyeccionId || m.esRecurrenteAuto) && (
+                          <span className="text-[10px] bg-violet-100 text-violet-700 border border-violet-200 px-1.5 py-0.5 rounded font-bold w-max uppercase tracking-wider">
+                            🔄 Proyección
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="p-4 align-middle whitespace-nowrap">
@@ -324,10 +450,10 @@ const Movimientos = () => {
                           {m.descripcion}
                         </span>
                         {m.tarjeta && (
-                          <span className="text-[10px] text-indigo-500 font-bold uppercase tracking-wide">
-                            💳 {m.tarjeta}
-                          </span>
-                        )}
+                            <span className="text-[10px] text-indigo-500 font-bold uppercase tracking-wide">
+                              💳 {getTarjeta(m.tarjeta)?.nombre || m.tarjeta}
+                            </span>
+                          )}
                       </div>
                     </td>
                     <td className="p-4 align-middle font-medium">{m.responsable || 'Sin asignar'}</td>
@@ -374,12 +500,12 @@ const Movimientos = () => {
         isOpen={isModalOpen} 
         onClose={closeModal} 
         title={editingId ? "Editar Movimiento" : "Nuevo Movimiento"}
+        maxWidth={showRightPanel ? "max-w-4xl" : "max-w-lg"}
       >
         <form onSubmit={handleSubmit}>
-          {/* Layout de 2 columnas: izquierda campos base, derecha tarjeta (si aplica) */}
-          <div className={cn("gap-6", formData.medioPago === 'Tarjeta' && formData.tipo === 'egreso' && !formData.esCuota ? "grid grid-cols-2" : "flex flex-col gap-4")}>
+          <div className={cn("gap-6", showRightPanel ? "grid lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]" : "flex flex-col gap-4")}>
 
-            {/* ─── Columna Izquierda / Campos Base ─── */}
+            {/* --- Columna Izquierda / Campos Base --- */}
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
@@ -468,18 +594,20 @@ const Movimientos = () => {
                     value={formData.medioPago || 'Efectivo'} 
                     onChange={(e) => {
                       const mp = e.target.value;
-                      // Si se elige Tarjeta, forzar estado pendiente automáticamente
+                      const isDebitoAutomatico = mp === 'Débito automático';
                       setFormData({
                         ...formData,
                         medioPago: mp,
                         tarjeta: '',
                         cantidadCuotas: '1',
+                        frecuencia: mp === 'Tarjeta' ? 'Única' : (isDebitoAutomatico ? 'Mensual' : formData.frecuencia),
                         estado: mp === 'Tarjeta' ? 'pendiente' : formData.estado
                       });
                     }}
                   >
                     <option value="Efectivo">Efectivo</option>
                     <option value="Débito">Débito</option>
+                    <option value="Débito automático">Débito automático</option>
                     <option value="Transferencia">Transferencia</option>
                     <option value="Tarjeta">Tarjeta</option>
                     <option value="Billetera virtual">Billetera virtual</option>
@@ -505,6 +633,22 @@ const Movimientos = () => {
                 </div>
               </div>
 
+              {(formData.medioPago === 'Débito' || formData.medioPago === 'Débito automático' || (formData.medioPago === 'Tarjeta' && formData.proyeccionId)) && (
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Tarjeta</label>
+                  <select
+                    className="w-full p-2 border rounded-md bg-background text-sm"
+                    required
+                    value={formData.tarjeta || ''}
+                    onChange={(e) => setFormData({ ...formData, tarjeta: e.target.value })}
+                  >
+                    <option value="">Seleccionar tarjeta...</option>
+                    {tarjetas && tarjetas.filter(t => t.activa).map(t => (
+                      <option key={t.id} value={t.id}>{t.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {editingId && formData.proyeccionId && (
                 <div className="p-2.5 bg-violet-50 border border-violet-200 rounded-md text-xs text-violet-800 font-medium">
@@ -513,64 +657,117 @@ const Movimientos = () => {
               )}
               {editingId && formData.esCuota && (
                 <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 font-medium">
-                  ⚠️ Estás editando una cuota individual. Para cambiar la financiación completa, elimina esta compra y vuelve a cargarla.
+                  Estas editando una cuota individual. Para cambiar la financiacion completa, elimina esta compra y vuelve a cargarla.
                 </div>
               )}
+
             </div>
 
-            {/* ─── Columna Derecha / Detalles de Tarjeta ─── */}
-            {formData.medioPago === 'Tarjeta' && formData.tipo === 'egreso' && !formData.esCuota && (
-              <div className="flex flex-col gap-3 p-4 bg-indigo-50/40 border border-indigo-100 rounded-xl">
-                <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
-                  💳 Detalles de Tarjeta
-                </p>
+            {showRightPanel && (
+              <div className="flex flex-col gap-3">
+                {showTarjetaPanel && (
+                  <div className="flex flex-col gap-3 p-4 bg-indigo-50/40 border border-indigo-100 rounded-xl">
+                    <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
+                      💳 Detalles de Tarjeta
+                    </p>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">Nombre de la Tarjeta</label>
-                  <select 
-                    className="w-full p-2 border rounded-md bg-background text-sm" 
-                    required={formData.medioPago === 'Tarjeta' && !formData.esCuota}
-                    value={formData.tarjeta || ''} 
-                    onChange={(e) => setFormData({...formData, tarjeta: e.target.value})} 
-                  >
-                    <option value="">Seleccionar tarjeta...</option>
-                    {tarjetas && tarjetas.filter(t => t.activa).map(t => (
-                      <option key={t.id} value={t.nombre}>{t.nombre}</option>
-                    ))}
-                  </select>
-                </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-700">Nombre de la Tarjeta</label>
+                      <select
+                        className="w-full p-2 border rounded-md bg-background text-sm"
+                        required={formData.medioPago === 'Tarjeta' && !formData.esCuota}
+                        value={formData.tarjeta || ''}
+                        onChange={(e) => setFormData({...formData, tarjeta: e.target.value})}
+                      >
+                        <option value="">Seleccionar tarjeta...</option>
+                        {tarjetas && tarjetas.filter(t => t.activa).map(t => (
+                          <option key={t.id} value={t.id}>{t.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">Cantidad de Cuotas</label>
-                  <input 
-                    type="number" 
-                    min="1" 
-                    placeholder="1"
-                    className="w-full p-2 border rounded-md bg-background text-sm font-medium" 
-                    required={formData.medioPago === 'Tarjeta' && !formData.esCuota}
-                    value={formData.cantidadCuotas || '1'} 
-                    onChange={(e) => setFormData({...formData, cantidadCuotas: e.target.value})} 
-                  />
-                </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-700">Cantidad de Cuotas</label>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="1"
+                        className="w-full p-2 border rounded-md bg-background text-sm font-medium"
+                        required={formData.medioPago === 'Tarjeta' && !formData.esCuota}
+                        value={formData.cantidadCuotas || '1'}
+                        onChange={(e) => setFormData({...formData, cantidadCuotas: e.target.value})}
+                      />
+                    </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">Fecha 1er Vencimiento</label>
-                  <input 
-                    type="date" 
-                    className="w-full p-2 border rounded-md bg-background text-sm font-medium" 
-                    required={formData.medioPago === 'Tarjeta' && !formData.esCuota}
-                    value={formData.fechaPrimeraCuota || ''} 
-                    onChange={(e) => setFormData({...formData, fechaPrimeraCuota: e.target.value})} 
-                  />
-                </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-700">Fecha 1er Vencimiento</label>
+                      <input
+                        type="date"
+                        className="w-full p-2 border rounded-md bg-background text-sm font-medium"
+                        required={formData.medioPago === 'Tarjeta' && !formData.esCuota}
+                        value={formData.fechaPrimeraCuota || ''}
+                        onChange={(e) => setFormData({...formData, fechaPrimeraCuota: e.target.value})}
+                      />
+                    </div>
 
-                {formData.monto && formData.fechaPrimeraCuota && (
-                  <div className="p-2.5 bg-indigo-100/60 rounded-md text-xs text-indigo-900 font-medium leading-relaxed mt-auto">
-                    {Number(formData.cantidadCuotas) > 1 ? (
-                      <span>💡 Referencia informativa + <span className="font-bold">{formData.cantidadCuotas}</span> cuotas de <span className="font-bold">${(Number(formData.monto) / Number(formData.cantidadCuotas)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> desde <span className="font-bold">{new Date(formData.fechaPrimeraCuota + 'T00:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</span>.</span>
-                    ) : (
-                      <span>💡 Referencia informativa + <span className="font-bold">1 cuota única</span> de <span className="font-bold">${(Number(formData.monto)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> en <span className="font-bold">{new Date(formData.fechaPrimeraCuota + 'T00:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</span>.</span>
+                    {formData.monto && formData.fechaPrimeraCuota && (
+                      <div className="p-2.5 bg-indigo-100/60 rounded-md text-xs text-indigo-900 font-medium leading-relaxed mt-auto">
+                        {Number(formData.cantidadCuotas) > 1 ? (
+                          <span>💡 Referencia informativa + <span className="font-bold">{formData.cantidadCuotas}</span> cuotas de <span className="font-bold">${(Number(formData.monto) / Number(formData.cantidadCuotas)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> desde <span className="font-bold">{new Date(formData.fechaPrimeraCuota + 'T00:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</span>.</span>
+                        ) : (
+                          <span>💡 Referencia informativa + <span className="font-bold">1 cuota Única</span> de <span className="font-bold">${(Number(formData.monto)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> en <span className="font-bold">{new Date(formData.fechaPrimeraCuota + 'T00:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</span>.</span>
+                        )}
+                      </div>
                     )}
+                  </div>
+                )}
+
+                {showRecurrenciaPanel && (
+                  <div className="flex flex-col gap-3 p-4 bg-violet-50/40 border border-violet-100 rounded-xl">
+                    <p className="text-xs font-bold text-violet-700 uppercase tracking-wider flex items-center gap-1.5">
+                      🔄 RECURRENCIA (Proyección Automática)
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium">Frecuencia</label>
+                        <select
+                          className="w-full p-2 border rounded-md bg-white border-violet-200 text-sm focus:ring-violet-500"
+                          value={formData.frecuencia || 'Única'}
+                          onChange={(e) => setFormData({ ...formData, frecuencia: e.target.value })}
+                        >
+                          <option value="Única">Única (un mes)</option>
+                          <option value="Mensual">Mensual</option>
+                          <option value="Bimestral">Bimestral</option>
+                          <option value="Trimestral">Trimestral</option>
+                          <option value="Semestral">Semestral</option>
+                          <option value="Anual">Anual</option>
+                        </select>
+                      </div>
+                      {formData.frecuencia && formData.frecuencia !== 'Única' && formData.frecuencia !== 'Única (un mes)' && (
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium">Estado</label>
+                          <select
+                            className="w-full p-2 border rounded-md bg-white border-violet-200 text-sm focus:ring-violet-500"
+                            value={formData.estadoRecurrencia || 'Activa'}
+                            onChange={(e) => setFormData({ ...formData, estadoRecurrencia: e.target.value })}
+                          >
+                            <option value="Activa">Activa</option>
+                            <option value="Inactiva">Inactiva (pausada)</option>
+                          </select>
+                        </div>
+                      )}
+                      {formData.frecuencia && formData.frecuencia !== 'Única' && formData.frecuencia !== 'Única (un mes)' && (
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium">Siguiente Cobro</label>
+                          <input
+                            type="date"
+                            className="w-full p-2 border rounded-md bg-white border-violet-200 text-sm focus:ring-violet-500"
+                            value={formData.fechaInicioProyeccion || formData.fecha}
+                            onChange={(e) => setFormData({ ...formData, fechaInicioProyeccion: e.target.value })}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

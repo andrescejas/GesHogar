@@ -4,6 +4,8 @@ import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import { useData } from '../context/DataContext';
+import { db } from '../lib/firebase';
+import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
 
 const Tarjetas = () => {
   const { tarjetas, addTarjeta, updateTarjeta, deleteTarjeta } = useData();
@@ -12,6 +14,7 @@ const Tarjetas = () => {
   // Estados Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [isFixing, setIsFixing] = useState(false);
   const [formData, setFormData] = useState({
     nombre: '', activa: true
   });
@@ -44,6 +47,52 @@ const Tarjetas = () => {
     setFormData({ nombre: '', activa: true });
   };
 
+  const fixTarjetasData = async () => {
+    if (!window.confirm('¿Reparar registros antiguos de tarjetas en movimientos y proyecciones?')) return;
+    setIsFixing(true);
+    try {
+      let count = 0;
+      // Reparar movimientos
+      const movSnap = await getDocs(collection(db, 'movimientos'));
+      for (const mDoc of movSnap.docs) {
+        const m = mDoc.data();
+        if (m.tarjeta && m.tarjeta.length > 0) {
+          const exists = tarjetas.some(t => t.id === m.tarjeta);
+          if (!exists) {
+            const matchedTarjeta = tarjetas.find(t => t.nombre.toLowerCase().trim() === m.tarjeta.toLowerCase().trim());
+            if (matchedTarjeta) {
+              await updateDoc(doc(db, 'movimientos', mDoc.id), { tarjeta: matchedTarjeta.id });
+              count++;
+            }
+          }
+        }
+      }
+      
+      // Reparar proyecciones
+      const proySnap = await getDocs(collection(db, 'proyecciones'));
+      for (const pDoc of proySnap.docs) {
+        const p = pDoc.data();
+        if (p.tarjeta && p.tarjeta.length > 0) {
+          const exists = tarjetas.some(t => t.id === p.tarjeta);
+          if (!exists) {
+            const matchedTarjeta = tarjetas.find(t => t.nombre.toLowerCase().trim() === p.tarjeta.toLowerCase().trim());
+            if (matchedTarjeta) {
+              await updateDoc(doc(db, 'proyecciones', pDoc.id), { tarjeta: matchedTarjeta.id });
+              count++;
+            }
+          }
+        }
+      }
+
+      alert(`Se han corregido ${count} registros exitosamente.`);
+    } catch (error) {
+      console.error(error);
+      alert('Error al corregir los datos.');
+    } finally {
+      setIsFixing(false);
+    }
+  };
+
   // Filtrado y Ordenamiento
   const filteredData = useMemo(() => {
     let result = [...tarjetas];
@@ -65,9 +114,14 @@ const Tarjetas = () => {
           <h2 className="text-3xl font-black tracking-tight">Tarjetas</h2>
           <p className="text-muted-foreground text-sm">Gestiona tus tarjetas de crédito y débito.</p>
         </div>
-        <Button className="flex items-center gap-2" onClick={() => setIsModalOpen(true)}>
-          <Plus className="h-4 w-4" /> Nueva Tarjeta
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="flex items-center gap-2 text-amber-600 border-amber-200 bg-amber-50" onClick={fixTarjetasData} disabled={isFixing}>
+            {isFixing ? 'Reparando...' : 'Reparar Datos'}
+          </Button>
+          <Button className="flex items-center gap-2" onClick={() => setIsModalOpen(true)}>
+            <Plus className="h-4 w-4" /> Nueva Tarjeta
+          </Button>
+        </div>
       </div>
 
       <div className="relative">

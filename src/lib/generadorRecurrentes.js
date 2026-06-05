@@ -59,6 +59,24 @@ export function getMesesVentana(ventana = 3) {
 }
 
 /**
+ * Calcula la fecha del movimiento dentro del mes objetivo respetando el dia
+ * elegido en fechaInicio. Si el mes no tiene ese dia, usa el ultimo dia.
+ *
+ * @param {object} proyeccion
+ * @param {string} mesObjetivo - formato "YYYY-MM"
+ * @returns {string} fecha en formato "YYYY-MM-DD"
+ */
+export function getFechaMovimientoEnMes(proyeccion, mesObjetivo) {
+  const fechaBase = proyeccion.fechaInicio || `${proyeccion.mes || mesObjetivo}-01`;
+  const diaBase = Number(fechaBase.substring(8, 10)) || 1;
+  const [year, month] = mesObjetivo.split('-').map(Number);
+  const ultimoDiaMes = new Date(year, month, 0).getDate();
+  const dia = Math.min(diaBase, ultimoDiaMes);
+
+  return `${mesObjetivo}-${String(dia).padStart(2, '0')}`;
+}
+
+/**
  * Genera los movimientos pendientes faltantes para todas las proyecciones
  * recurrentes activas con generarMovimientos === true.
  *
@@ -92,7 +110,7 @@ export async function generarMovimientosRecurrentes(proyecciones, movimientos, a
       // Crear el movimiento pendiente
       await addMovimiento({
         proyeccionId: proy.id,
-        fecha: `${mes}-01`,
+        fecha: getFechaMovimientoEnMes(proy, mes),
         mes,
         tipo: proy.tipo,
         categoriaId: proy.categoriaId,
@@ -105,6 +123,7 @@ export async function generarMovimientosRecurrentes(proyecciones, movimientos, a
         esCuota: false,
         contabiliza: true,
         esRecurrenteAuto: true,
+        tarjeta: proy.tarjeta || '',
       });
       creados++;
     }

@@ -30,22 +30,7 @@ const Comparativo = () => {
         })
         .reduce((acc, p) => acc + (Number(p.montoProyectado) || 0), 0);
         
-      let proy = proyFisica;
-
-      if (cat.tipo === 'egreso') {
-        // Cuotas de tarjeta
-        const cuotasProy = movimientos
-          .filter(m => 
-            m.esCuota === true && 
-            m.fecha.startsWith(mes) && 
-            m.categoriaId === cat.id && 
-            (isSinSub ? !m.subcategoriaId : m.subcategoriaId === sub.id) &&
-            m.contabiliza !== false
-          )
-          .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
-
-        proy = proyFisica + cuotasProy;
-      }
+      const proy = proyFisica;
         
       // Real: SOLO movimientos en estado 'pagado'
       const real = movimientos

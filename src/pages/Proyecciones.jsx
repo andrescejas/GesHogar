@@ -24,9 +24,7 @@ const Proyecciones = () => {
     frecuencia: 'Única',
     fechaInicio: new Date().toISOString().substring(0, 10),
     fechaFin: '',
-    generarMovimientos: false,
-    estado: 'Activa',
-    medioPago: 'Efectivo'
+    generarMovimientos: false
   });
 
   const proyeccionesList = useMemo(() => {
@@ -55,23 +53,8 @@ const Proyecciones = () => {
         default: return false;
       }
     });
-    
-    const proysVirtualesCuotas = (movimientos || [])
-      .filter(m => m.esCuota === true && m.fecha.startsWith(mes) && m.tipo === 'egreso' && m.contabiliza !== false)
-      .map(m => ({
-        id: `virtual-cuota-${m.id}`,
-        categoriaId: m.categoriaId,
-        subcategoriaId: m.subcategoriaId,
-        montoProyectado: Number(m.monto),
-        tipo: 'egreso',
-        descripcion: m.descripcion,
-        responsable: m.responsable,
-        isVirtual: true,
-        virtualType: 'Tarjeta'
-      }));
-
-    return [...proManuales, ...proysVirtualesCuotas];
-  }, [proyecciones, movimientos, mes]);
+    return proManuales;
+  }, [proyecciones, mes]);
 
   const handleOpenModal = (proyeccion = null) => {
     if (proyeccion) {
@@ -85,9 +68,7 @@ const Proyecciones = () => {
         frecuencia: proyeccion.frecuencia || 'Única',
         fechaInicio: proyeccion.fechaInicio || new Date().toISOString().substring(0, 10),
         fechaFin: proyeccion.fechaFin || '',
-        generarMovimientos: proyeccion.generarMovimientos || false,
-        estado: proyeccion.estado || 'Activa',
-        medioPago: proyeccion.medioPago || 'Efectivo'
+        generarMovimientos: proyeccion.generarMovimientos || false
       });
     } else {
       setFormData({ 
@@ -100,9 +81,7 @@ const Proyecciones = () => {
         frecuencia: 'Única',
         fechaInicio: new Date(mes + '-01T12:00:00').toISOString().substring(0, 10),
         fechaFin: '',
-        generarMovimientos: false,
-        estado: 'Activa',
-        medioPago: 'Efectivo'
+        generarMovimientos: false
       });
     }
     setIsModalOpen(true);
@@ -137,18 +116,19 @@ const Proyecciones = () => {
           montoProyectado: Number(formData.monto),
           tipo: cat.tipo,
           descripcion: formData.descripcion,
-          responsable: formData.responsable,
-          frecuencia: formData.frecuencia,
-          fechaInicio: formData.fechaInicio,
-          fechaFin: formData.fechaFin,
-          generarMovimientos: formData.generarMovimientos,
-          estado: formData.estado,
-          medioPago: formData.medioPago
+          responsable: formData.responsable
         });
 
         if (updateFuture) {
           const futureMovs = (movimientos || []).filter(m => m.proyeccionId === formData.id && m.estado === 'pendiente' && m.fecha >= formData.fechaInicio);
-          const promises = futureMovs.map(m => updateMovimiento(m.id, { monto: Number(formData.monto) }));
+          const promises = futureMovs.map(m => updateMovimiento(m.id, {
+            categoriaId: formData.categoriaId,
+            subcategoriaId: formData.subcategoriaId,
+            monto: Number(formData.monto),
+            tipo: cat.tipo,
+            descripcion: formData.descripcion,
+            responsable: formData.responsable
+          }));
           await Promise.all(promises);
         }
       } else {
@@ -160,19 +140,17 @@ const Proyecciones = () => {
           descripcion: formData.descripcion, 
           subcategoriaId: formData.subcategoriaId, 
           responsable: formData.responsable,
-          frecuencia: formData.frecuencia,
-          fechaInicio: formData.fechaInicio,
-          fechaFin: formData.fechaFin,
-          generarMovimientos: formData.generarMovimientos,
-          estado: formData.estado,
-          medioPago: formData.medioPago
+          frecuencia: 'Única',
+          fechaInicio: '',
+          fechaFin: '',
+          generarMovimientos: false
         });
       }
       
       setIsModalOpen(false);
       setFormData({ 
         id: null, categoriaId: '', subcategoriaId: '', descripcion: '', responsable: '', monto: '',
-        frecuencia: 'Única', fechaInicio: new Date().toISOString().substring(0, 10), fechaFin: '', generarMovimientos: false, estado: 'Activa', medioPago: 'Efectivo'
+        frecuencia: 'Única', fechaInicio: new Date().toISOString().substring(0, 10), fechaFin: '', generarMovimientos: false
       });
       alert('Proyección guardada correctamente');
     } catch (error) {
@@ -243,9 +221,7 @@ const Proyecciones = () => {
           frecuencia: 'Única',
           fechaInicio: '',
           fechaFin: '',
-          generarMovimientos: false,
-          estado: 'Activa',
-          medioPago: d.medioPago || 'Efectivo'
+          generarMovimientos: false
         });
       });
 
@@ -445,10 +421,9 @@ const Proyecciones = () => {
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         title={formData.id ? "Editar Proyección" : "Agregar Proyección"}
-        maxWidth="max-w-4xl"
+        maxWidth="max-w-2xl"
       >
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-start">
           <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Categoría</label>
@@ -515,91 +490,6 @@ const Proyecciones = () => {
               value={formData.monto}
               onChange={(e) => setFormData({...formData, monto: e.target.value})}
             />
-          </div>
-
-          {/* Bloque Recurrencia */}
-          </div>
-          <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3 lg:sticky lg:top-0">
-            <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider">🔄 Recurrencia</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-medium">Frecuencia</label>
-                <select
-                  className="w-full p-2 border rounded-md bg-background text-sm"
-                  value={formData.frecuencia}
-                  onChange={(e) => setFormData({...formData, frecuencia: e.target.value, generarMovimientos: e.target.value !== 'Única' ? formData.generarMovimientos : false})}
-                >
-                  <option value="Única">Única (un mes)</option>
-                  <option value="Mensual">Mensual</option>
-                  <option value="Bimestral">Bimestral</option>
-                  <option value="Trimestral">Trimestral</option>
-                  <option value="Semestral">Semestral</option>
-                  <option value="Anual">Anual</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium">Estado</label>
-                <select
-                  className="w-full p-2 border rounded-md bg-background text-sm"
-                  value={formData.estado}
-                  onChange={(e) => setFormData({...formData, estado: e.target.value})}
-                >
-                  <option value="Activa">Activa</option>
-                  <option value="Inactiva">Inactiva (pausada)</option>
-                </select>
-              </div>
-            </div>
-
-            {formData.frecuencia !== 'Única' && (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">Fecha Inicio</label>
-                    <input
-                      type="date"
-                      className="w-full p-2 border rounded-md bg-background text-sm"
-                      value={formData.fechaInicio}
-                      onChange={(e) => setFormData({...formData, fechaInicio: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">Fecha Fin (opcional)</label>
-                    <input
-                      type="date"
-                      className="w-full p-2 border rounded-md bg-background text-sm"
-                      value={formData.fechaFin}
-                      onChange={(e) => setFormData({...formData, fechaFin: e.target.value})}
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      checked={formData.generarMovimientos}
-                      onChange={(e) => setFormData({...formData, generarMovimientos: e.target.checked})}
-                    />
-                    <div className="w-9 h-5 bg-slate-200 peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
-                  </label>
-                  <span className="text-xs font-medium">Generar movimientos automáticamente</span>
-                </div>
-              </>
-            )}
-
-            <div className="space-y-1">
-              <label className="text-xs font-medium">Medio de Pago</label>
-              <select
-                className="w-full p-2 border rounded-md bg-background text-sm"
-                value={formData.medioPago}
-                onChange={(e) => setFormData({...formData, medioPago: e.target.value})}
-              >
-                <option value="Efectivo">Efectivo</option>
-                <option value="Débito">Débito</option>
-                <option value="Transferencia">Transferencia</option>
-                <option value="Billetera virtual">Billetera virtual</option>
-              </select>
-            </div>
           </div>
           </div>
           <div className="flex justify-end gap-3 pt-4">
