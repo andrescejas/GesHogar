@@ -10,6 +10,7 @@ const Movimientos = () => {
   const { movimientos, categorias, subcategorias, tarjetas, proyecciones, addMovimiento, updateMovimiento, deleteMovimiento, saveProyeccion, updateProyeccion, deleteProyeccion, loading } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTarjeta, setFilterTarjeta] = useState('');
+  const [filterEstado, setFilterEstado] = useState('');
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -47,6 +48,14 @@ const Movimientos = () => {
     const date = new Date(`${fecha}T00:00:00`);
     date.setMonth(date.getMonth() + cantidadMeses);
     return date.toISOString().split('T')[0];
+  };
+
+  const formatearMesCuota = (fecha) => {
+    if (!fecha) return '';
+    return new Date(`${fecha}T00:00:00`).toLocaleDateString('es-AR', {
+      month: 'long',
+      year: 'numeric'
+    });
   };
 
   const getIntervaloMeses = (frecuencia) => {
@@ -118,13 +127,17 @@ const Movimientos = () => {
           baseDate.setMonth(baseDate.getMonth() + (i - 1));
           const cuotaFecha = baseDate.toISOString().split('T')[0];
           const cuotaMes = cuotaFecha.substring(0, 7);
+          const mesCuotaDescripcion = formatearMesCuota(cuotaFecha);
+          const descripcionCuota = totalCuotas > 1
+            ? `${formData.descripcion} (Cuota ${i}/${totalCuotas} - ${mesCuotaDescripcion})`
+            : `${formData.descripcion} (Cuota unica - ${mesCuotaDescripcion})`;
 
           promesas.push(addMovimiento({
             tipo: 'egreso',
             categoriaId: formData.categoriaId,
             subcategoriaId: formData.subcategoriaId,
             responsable: formData.responsable || '',
-            descripcion: totalCuotas > 1 ? `${formData.descripcion} (Cuota ${i}/${totalCuotas})` : `${formData.descripcion} (Cuota Única)`,
+            descripcion: descripcionCuota,
             monto: cuotaMonto,
             fecha: cuotaFecha,
             mes: cuotaMes,
@@ -307,6 +320,7 @@ const Movimientos = () => {
   const filteredMovimientos = movimientos.filter(m => {
     if (mes && !m.fecha.startsWith(mes)) return false;
     if (filterTarjeta && getTarjeta(m.tarjeta)?.id !== filterTarjeta) return false;
+    if (filterEstado && m.estado !== filterEstado) return false;
 
     const search = searchTerm.toLowerCase();
     const categoriaNombre = categorias.find(c => c.id === m.categoriaId)?.nombre || '';
@@ -378,6 +392,16 @@ const Movimientos = () => {
                 {tarjetas.filter(t => t.activa).map(t => (
                   <option key={t.id} value={t.id}>{t.nombre}</option>
                 ))}
+              </select>
+              <select
+                className="p-2 border rounded-md bg-background text-sm font-medium"
+                value={filterEstado}
+                onChange={(e) => setFilterEstado(e.target.value)}
+              >
+                <option value="">Todos los estados</option>
+                <option value="pagado">Pagado</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="proyectado">Proyectado</option>
               </select>
               <input 
                 type="month" 
