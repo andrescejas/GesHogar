@@ -9,7 +9,8 @@ import { cn } from '../lib/utils';
 const Movimientos = () => {
   const { movimientos, categorias, subcategorias, tarjetas, proyecciones, addMovimiento, updateMovimiento, deleteMovimiento, saveProyeccion, updateProyeccion, deleteProyeccion, loading } = useData();
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterTarjeta, setFilterTarjeta] = useState('');
+  const [filterTarjetas, setFilterTarjetas] = useState([]);
+  const [filterResponsable, setFilterResponsable] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,6 +80,29 @@ const Movimientos = () => {
 
     return fechaInicio;
   };
+
+  const responsables = Array.from(
+    new Set([
+      'Andres',
+      'Cecilia',
+      'Agustin',
+      ...movimientos.map(m => m.responsable).filter(Boolean)
+    ])
+  ).sort((a, b) => a.localeCompare(b));
+
+  const toggleFilterTarjeta = (tarjetaId) => {
+    setFilterTarjetas(prev =>
+      prev.includes(tarjetaId)
+        ? prev.filter(id => id !== tarjetaId)
+        : [...prev, tarjetaId]
+    );
+  };
+
+  const filterTarjetasLabel = filterTarjetas.length === 0
+    ? 'Todas las tarjetas'
+    : filterTarjetas.length === 1
+      ? tarjetas.find(t => t.id === filterTarjetas[0])?.nombre || '1 tarjeta'
+      : `${filterTarjetas.length} tarjetas`;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -319,7 +343,9 @@ const Movimientos = () => {
 
   const filteredMovimientos = movimientos.filter(m => {
     if (mes && !m.fecha.startsWith(mes)) return false;
-    if (filterTarjeta && getTarjeta(m.tarjeta)?.id !== filterTarjeta) return false;
+    if (filterTarjetas.length > 0 && !filterTarjetas.includes(getTarjeta(m.tarjeta)?.id)) return false;
+    if (filterResponsable === '__sin_asignar__' && m.responsable) return false;
+    if (filterResponsable && filterResponsable !== '__sin_asignar__' && (m.responsable || '') !== filterResponsable) return false;
     if (filterEstado && m.estado !== filterEstado) return false;
 
     const search = searchTerm.toLowerCase();
@@ -383,14 +409,44 @@ const Movimientos = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <CardTitle>Historial de Transacciones</CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
+              <details className="relative">
+                <summary className="list-none [&::-webkit-details-marker]:hidden p-2 border rounded-md bg-background text-sm font-medium cursor-pointer min-w-[180px] flex items-center justify-between gap-3">
+                  <span className="truncate">{filterTarjetasLabel}</span>
+                  <span className="text-xs text-muted-foreground">▾</span>
+                </summary>
+                <div className="absolute right-0 z-20 mt-2 w-64 rounded-md border bg-background shadow-lg p-2">
+                  <button
+                    type="button"
+                    className="w-full text-left px-2 py-1.5 rounded text-sm font-medium hover:bg-accent"
+                    onClick={() => setFilterTarjetas([])}
+                  >
+                    Todas las tarjetas
+                  </button>
+                  <div className="my-1 border-t" />
+                  <div className="max-h-64 overflow-auto space-y-1">
+                    {tarjetas.filter(t => t.activa).map(t => (
+                      <label key={t.id} className="flex items-center gap-2 px-2 py-1.5 rounded text-sm cursor-pointer hover:bg-accent">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={filterTarjetas.includes(t.id)}
+                          onChange={() => toggleFilterTarjeta(t.id)}
+                        />
+                        <span className="truncate">{t.nombre}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </details>
               <select
                 className="p-2 border rounded-md bg-background text-sm font-medium"
-                value={filterTarjeta}
-                onChange={(e) => setFilterTarjeta(e.target.value)}
+                value={filterResponsable}
+                onChange={(e) => setFilterResponsable(e.target.value)}
               >
-                <option value="">Todas las tarjetas</option>
-                {tarjetas.filter(t => t.activa).map(t => (
-                  <option key={t.id} value={t.id}>{t.nombre}</option>
+                <option value="">Todos los responsables</option>
+                <option value="__sin_asignar__">Sin asignar</option>
+                {responsables.map(responsable => (
+                  <option key={responsable} value={responsable}>{responsable}</option>
                 ))}
               </select>
               <select
