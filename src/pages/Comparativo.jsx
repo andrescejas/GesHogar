@@ -32,12 +32,12 @@ const Comparativo = () => {
         
       const proy = proyFisica;
         
-      // Real: SOLO movimientos en estado 'pagado'
+      // Real: movimientos concretos del mes, pagados o pendientes.
       const real = movimientos
         .filter(m => 
           (m.categoriaId === cat.id || m.categoria === cat.nombre) && 
           m.fecha.startsWith(mes) && 
-          m.estado === 'pagado' && 
+          m.estado !== 'proyectado' && 
           (isSinSub ? !m.subcategoriaId : m.subcategoriaId === sub.id) &&
           m.contabiliza !== false
         )
