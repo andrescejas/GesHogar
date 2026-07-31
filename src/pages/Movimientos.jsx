@@ -17,6 +17,7 @@ const Movimientos = () => {
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     fecha: new Date().toISOString().split('T')[0],
+    fechaPago: '',
     tipo: 'egreso',
     categoriaId: '',
     subcategoriaId: '',
@@ -107,10 +108,11 @@ const Movimientos = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.categoriaId || !formData.subcategoriaId) {
-      alert('Debes seleccionar una Categoría y una Subcategoría.');
-      return;
-    }
+    try {
+      if (!formData.categoriaId || !formData.subcategoriaId) {
+        alert('Debes seleccionar una Categoría y una Subcategoría.');
+        return;
+      }
 
     const totalCuotas = Number(formData.cantidadCuotas || 1);
 
@@ -199,6 +201,7 @@ const Movimientos = () => {
         cantidadCuotas: (formData.medioPago === 'Tarjeta' && !formData.proyeccionId) ? totalCuotas : 1,
         fechaPrimeraCuota: (formData.medioPago === 'Tarjeta' && !formData.proyeccionId) ? formData.fechaPrimeraCuota : '',
         esCuota: formData.esCuota || false,
+        fechaPago: formData.estado === 'pagado' ? (formData.fechaPago || formData.fecha) : '',
         contabiliza: (formData.esCuota === false && formData.medioPago === 'Tarjeta' && !formData.proyeccionId) ? false : (formData.contabiliza !== undefined ? formData.contabiliza : true),
         mes: formData.fecha.substring(0, 7)
       };
@@ -206,14 +209,19 @@ const Movimientos = () => {
       if (editingId) {
         await updateMovimiento(editingId, data);
         if (formData.proyeccionId) {
-          await updateProyeccion(formData.proyeccionId, {
-            frecuencia: formData.frecuencia,
-            fechaInicio: formData.fechaInicioProyeccion,
-            generarMovimientos: formData.frecuencia !== 'Única' && formData.frecuencia !== 'Única (un mes)',
-            estado: formData.estadoRecurrencia || 'Activa',
-            medioPago: formData.medioPago || 'Efectivo',
-            tarjeta: usaTarjeta(formData.medioPago) ? formData.tarjeta : ''
-          });
+          const proyeccionExiste = proyecciones.some(p => p.id === formData.proyeccionId);
+          if (proyeccionExiste) {
+            await updateProyeccion(formData.proyeccionId, {
+              frecuencia: formData.frecuencia,
+              fechaInicio: formData.fechaInicioProyeccion,
+              generarMovimientos: formData.frecuencia !== 'Única' && formData.frecuencia !== 'Única (un mes)',
+              estado: formData.estadoRecurrencia || 'Activa',
+              medioPago: formData.medioPago || 'Efectivo',
+              tarjeta: usaTarjeta(formData.medioPago) ? formData.tarjeta : ''
+            });
+          } else {
+            console.warn("La proyección asociada fue eliminada. Se omite su actualización.");
+          }
         }
       } else {
         await addMovimiento(data);
@@ -248,7 +256,11 @@ const Movimientos = () => {
         console.error("Error al crear la proyección automática:", err);
       }
     }
-    closeModal();
+      closeModal();
+    } catch (error) {
+      console.error("Error general al guardar:", error);
+      alert("Hubo un error interno al guardar: " + error.message);
+    }
   };
 
   const handleEdit = (m) => {
@@ -271,6 +283,7 @@ const Movimientos = () => {
       cantidadCuotas: m.cantidadCuotas?.toString() || '1',
       fechaPrimeraCuota: m.fechaPrimeraCuota || new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
       esCuota: m.esCuota || false,
+      fechaPago: m.fechaPago || '',
       proyeccionId: m.proyeccionId || null,
       frecuencia: proyeccion?.frecuencia || 'Única',
       estadoRecurrencia: proyeccion?.estado || 'Activa',
@@ -334,6 +347,7 @@ const Movimientos = () => {
       cantidadCuotas: '1',
       fechaPrimeraCuota: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
       esCuota: false,
+      fechaPago: '',
       proyeccionId: null,
       frecuencia: 'Única',
       estadoRecurrencia: 'Activa',
@@ -489,8 +503,9 @@ const Movimientos = () => {
                   <th className="h-12 px-4 text-left align-middle text-muted-foreground">Subcategoría</th>
                   <th className="h-12 px-4 text-left align-middle text-muted-foreground">Descripción</th>
                   <th className="h-12 px-4 text-left align-middle text-muted-foreground">Responsable</th>
-                  <th className="h-12 px-4 text-right align-middle text-muted-foreground">Monto</th>
+                  <th className="h-12 px-4 text-left align-middle text-muted-foreground">Monto</th>
                   <th className="h-12 px-4 text-left align-middle text-muted-foreground">Estado</th>
+                  <th className="h-12 px-4 text-left align-middle text-muted-foreground">Pago</th>
                   <th className="h-12 px-4 text-right align-middle text-muted-foreground">Acciones</th>
                 </tr>
               </thead>
@@ -534,6 +549,14 @@ const Movimientos = () => {
                               💳 {getTarjeta(m.tarjeta)?.nombre || m.tarjeta}
                             </span>
                           )}
+                        {m.esCuota && m.compraId && (() => {
+                          const compraOrig = movimientos.find(mov => mov.id === m.compraId && mov.contabiliza === false);
+                          return compraOrig ? (
+                            <span className="text-[10px] text-slate-500 font-medium mt-0.5 whitespace-normal">
+                              📅 Comprado el {compraOrig.fecha.split('-').reverse().join('/')}
+                            </span>
+                          ) : null;
+                        })()}
                       </div>
                     </td>
                     <td className="p-4 align-middle font-medium">{m.responsable || 'Sin asignar'}</td>
@@ -561,6 +584,9 @@ const Movimientos = () => {
                       )}>
                         {m.estado}
                       </span>
+                    </td>
+                    <td className="p-4 align-middle whitespace-nowrap text-xs text-slate-500 font-medium">
+                      {m.estado === 'pagado' && m.fechaPago ? m.fechaPago.split('-').reverse().join('/') : '-'}
                     </td>
                     <td className="p-4 align-middle text-right">
                       <div className="flex justify-end gap-1">
@@ -705,12 +731,30 @@ const Movimientos = () => {
                   <select 
                     className={cn("w-full p-2 border rounded-md bg-background text-sm", formData.medioPago === 'Tarjeta' ? "text-amber-700 font-semibold border-amber-300 bg-amber-50/30" : "")}
                     value={formData.estado} 
-                    onChange={(e) => setFormData({...formData, estado: e.target.value})}
+                    onChange={(e) => {
+                      const nuevoEstado = e.target.value;
+                      setFormData({
+                        ...formData, 
+                        estado: nuevoEstado,
+                        fechaPago: nuevoEstado === 'pagado' ? (formData.fechaPago || new Date().toISOString().split('T')[0]) : ''
+                      });
+                    }}
                   >
                     <option value="pagado">Pagado</option>
                     <option value="pendiente">Pendiente</option>
                   </select>
                 </div>
+                {formData.estado === 'pagado' && (
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Fecha de Pago</label>
+                    <input 
+                      type="date" 
+                      className="w-full p-2 border rounded-md bg-background text-sm" 
+                      value={formData.fechaPago || ''} 
+                      onChange={(e) => setFormData({...formData, fechaPago: e.target.value})} 
+                    />
+                  </div>
+                )}
               </div>
 
               {(formData.medioPago === 'Débito' || formData.medioPago === 'Débito automático' || (formData.medioPago === 'Tarjeta' && formData.proyeccionId)) && (
