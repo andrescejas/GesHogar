@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -15,6 +15,19 @@ const Movimientos = () => {
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+
+  const tarjetasDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (tarjetasDropdownRef.current && !tarjetasDropdownRef.current.contains(event.target)) {
+        tarjetasDropdownRef.current.removeAttribute('open');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const [formData, setFormData] = useState({
     fecha: new Date().toISOString().split('T')[0],
     fechaPago: '',
@@ -423,7 +436,7 @@ const Movimientos = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <CardTitle>Historial de Transacciones</CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
-              <details className="relative">
+              <details ref={tarjetasDropdownRef} className="relative">
                 <summary className="list-none [&::-webkit-details-marker]:hidden p-2 border rounded-md bg-background text-sm font-medium cursor-pointer min-w-[180px] flex items-center justify-between gap-3">
                   <span className="truncate">{filterTarjetasLabel}</span>
                   <span className="text-xs text-muted-foreground">▾</span>
