@@ -148,7 +148,8 @@ const Movimientos = () => {
           fechaPrimeraCuota: formData.fechaPrimeraCuota,
           esCuota: false,
           contabiliza: false, // Compra de referencia no contabiliza
-          mes: formData.fecha.substring(0, 7)
+          mes: formData.fecha.substring(0, 7),
+          fechaCarga: new Date().toISOString()
         };
 
         const originalDoc = await addMovimiento(dataOriginal);
@@ -188,7 +189,8 @@ const Movimientos = () => {
             cantidadCuotas: totalCuotas,
             movimientoOrigenId: originalId,
             compraId: originalId,
-            contabiliza: true // Las cuotas sí contabilizan
+            contabiliza: true, // Las cuotas sí contabilizan
+            fechaCarga: new Date().toISOString()
           }));
         }
 
@@ -218,6 +220,10 @@ const Movimientos = () => {
         contabiliza: (formData.esCuota === false && formData.medioPago === 'Tarjeta' && !formData.proyeccionId) ? false : (formData.contabiliza !== undefined ? formData.contabiliza : true),
         mes: formData.fecha.substring(0, 7)
       };
+
+      if (!editingId) {
+        data.fechaCarga = new Date().toISOString();
+      }
 
       if (editingId) {
         await updateMovimiento(editingId, data);
@@ -396,12 +402,39 @@ const Movimientos = () => {
   const showRecurrenciaPanel = (!editingId || formData.proyeccionId) && formData.tipo === 'egreso' && (formData.medioPago !== 'Tarjeta' || formData.proyeccionId);
   const showRightPanel = showTarjetaPanel || showRecurrenciaPanel;
 
+  const hoy = new Date().toISOString().split('T')[0];
+  const movimientosManuales = movimientos.filter(m => 
+    m.estado !== 'proyectado' && 
+    !m.esCuota && 
+    m.contabiliza !== false &&
+    !m.proyeccionId &&
+    !m.esRecurrenteAuto &&
+    m.fecha <= hoy
+  );
+  
+  const ultimaFechaCargada = movimientosManuales.length > 0
+    ? movimientosManuales.reduce((max, m) => m.fecha > max ? m.fecha : max, movimientosManuales[0].fecha)
+    : null;
+
+  const formatFechaAAR = (fecha) => {
+    if (!fecha) return '';
+    const [year, month, day] = fecha.split('-');
+    return `${day}/${month}/${year}`;
+  };
+
   if (loading) return <div className="flex items-center justify-center h-full">Cargando...</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">Movimientos</h2>
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Movimientos</h2>
+          {ultimaFechaCargada && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Último movimiento cargado: <span className="font-semibold text-slate-700">{formatFechaAAR(ultimaFechaCargada)}</span>
+            </p>
+          )}
+        </div>
         <Button className="flex items-center gap-2" onClick={() => setIsModalOpen(true)}>
           <Plus className="h-4 w-4" />
           Nuevo Movimiento
