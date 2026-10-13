@@ -9,7 +9,8 @@ import {
   doc, 
   onSnapshot,
   query,
-  orderBy
+  orderBy,
+  writeBatch
 } from 'firebase/firestore';
 
 const DataContext = createContext();
@@ -20,7 +21,18 @@ export const DataProvider = ({ children }) => {
   const [tarjetas, setTarjetas] = useState([]);
   const [movimientos, setMovimientos] = useState([]);
   const [proyecciones, setProyecciones] = useState([]);
+  const [reglas, setReglas] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Escuchar reglas de categorización en tiempo real
+  useEffect(() => {
+    const q = query(collection(db, 'reglas_categorizacion'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setReglas(data);
+    }, (error) => console.error("Error Reglas:", error));
+    return () => unsubscribe();
+  }, []);
 
   // Escuchar categorías en tiempo real
   useEffect(() => {
@@ -108,6 +120,82 @@ export const DataProvider = ({ children }) => {
 
   const deleteProyeccion = useCallback(async (id) => await deleteDoc(doc(db, 'proyecciones', id)), []);
 
+  // Guardado masivo por lote de proyecciones (WriteBatch)
+  const saveProyeccionesBatch = useCallback(async (operaciones = []) => {
+    if (!operaciones || operaciones.length === 0) return;
+    const chunkSize = 400;
+    for (let i = 0; i < operaciones.length; i += chunkSize) {
+      const chunk = operaciones.slice(i, i + chunkSize);
+      const batch = writeBatch(db);
+
+      for (const op of chunk) {
+        if (op.action === 'create') {
+          const ref = doc(collection(db, 'proyecciones'));
+          batch.set(ref, {
+            ...op.data,
+            montoProyectado: Number(op.data.montoProyectado || op.data.monto || 0),
+            creadoEn: new Date().toISOString()
+          });
+        } else if (op.action === 'update') {
+          const ref = doc(db, 'proyecciones', op.id);
+          const updateData = { ...op.data };
+          if (updateData.montoProyectado !== undefined) {
+            updateData.montoProyectado = Number(updateData.montoProyectado);
+          }
+          batch.update(ref, {
+            ...updateData,
+            actualizadoEn: new Date().toISOString()
+          });
+        } else if (op.action === 'delete') {
+          const ref = doc(db, 'proyecciones', op.id);
+          batch.delete(ref);
+        }
+      }
+
+      await batch.commit();
+    }
+  }, []);
+
+  // CRUD Reglas de categorización
+  const addRegla = useCallback(async (nueva) => await addDoc(collection(db, 'reglas_categorizacion'), nueva), []);
+  const deleteRegla = useCallback(async (id) => await deleteDoc(doc(db, 'reglas_categorizacion', id)), []);
+
+  // Importación masiva por lotes (WriteBatch)
+  const importarMovimientosBatch = useCallback(async (movimientosAImportar = [], nuevasReglas = []) => {
+    // 1. Guardar nuevas reglas aprendidas si las hay
+    for (const regla of nuevasReglas) {
+      if (regla.patron && regla.categoriaId) {
+        await addDoc(collection(db, 'reglas_categorizacion'), {
+          patron: regla.patron.toLowerCase().trim(),
+          categoriaId: regla.categoriaId,
+          subcategoriaId: regla.subcategoriaId || '',
+          activo: true,
+          creadoEn: new Date().toISOString()
+        });
+      }
+    }
+
+    // 2. Insertar movimientos en lotes de hasta 400
+    const chunkSize = 400;
+    for (let i = 0; i < movimientosAImportar.length; i += chunkSize) {
+      const chunk = movimientosAImportar.slice(i, i + chunkSize);
+      const batch = writeBatch(db);
+
+      for (const mov of chunk) {
+        const ref = doc(collection(db, 'movimientos'));
+        // Limpiar campos temporales de UI
+        // eslint-disable-next-line no-unused-vars
+        const { idTemp, autoMatch, origenRegla, seleccionado, guardarRegla, esDuplicado, categoriaNombre, subcategoriaNombre, ...datosLimpios } = mov;
+        batch.set(ref, {
+          ...datosLimpios,
+          importadoEn: new Date().toISOString()
+        });
+      }
+
+      await batch.commit();
+    }
+  }, []);
+
   // Generador automático: cubre ventana mes actual + 3 meses sin duplicados
   const generandoRef = useRef(false);
   useEffect(() => {
@@ -127,6 +215,7 @@ export const DataProvider = ({ children }) => {
       tarjetas,
       movimientos, 
       proyecciones,
+      reglas,
       loading,
       addCategoria, 
       updateCategoria,
@@ -142,7 +231,11 @@ export const DataProvider = ({ children }) => {
       deleteMovimiento,
       saveProyeccion,
       updateProyeccion,
-      deleteProyeccion
+      deleteProyeccion,
+      saveProyeccionesBatch,
+      addRegla,
+      deleteRegla,
+      importarMovimientosBatch
     }}>
       {children}
     </DataContext.Provider>

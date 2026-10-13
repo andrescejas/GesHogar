@@ -18,7 +18,14 @@
 - **Últimos Movimientos:** Lista rápida de las transacciones más recientes.
 
 ### 3.2. Gestión de Movimientos (Transacciones)
-- Registro completo de ingresos y egresos (ABM/CRUD).
+- Registro de transacciones con soporte híbrido:
+  - **Carga Manual:** Reservada exclusivamente para consumos y movimientos en **Efectivo**.
+  - **Importador Inteligente de Resúmenes:** Carga automatizada por lotes desde archivos exportados de Mercado Pago (`.pdf` / `.csv`), Banco Santander (`.xlsx`), Bancor y Tarjetas.
+- **Conciliación y Filtros Automáticos:**
+  - Detección de transferencias internas entre cuentas del hogar (marcadas con `contabiliza: false` para no inflar saldos ni gastos).
+  - Detección de pagos de resúmenes de tarjeta de crédito (marcados con `contabiliza: false` para evitar doble computación con los consumos de la tarjeta).
+  - Motor de auto-clasificación por reglas inteligentes y aprendizaje de comercios frecuentes.
+  - Deduplicación por hash de transacción y número de referencia.
 - Campos capturados:
   - **Fecha** del movimiento.
   - **Tipo:** Ingreso o Egreso.
@@ -27,6 +34,7 @@
   - **Responsable:** Miembro del hogar asignado (ej. Andres, Cecilia, Agustin).
   - **Monto.**
   - **Estado:** Pagado, Pendiente, Proyectado.
+  - **Contabiliza:** Booleano que define si impacta en totales o es informativo/transferencia interna.
 - Buscador inteligente multi-campo integrado en el historial.
 
 ### 3.3. Estructura Jerárquica (Categorías y Subcategorías)
@@ -34,9 +42,9 @@
 - **Categorías (Agrupador Visual):** Funcionan únicamente como organización visual, agrupación jerárquica y navegación (ej. "Alimentación").
 - Asignación de íconos representativos para una rápida identificación visual.
 
-### 3.4. Análisis Comparativo y Proyecciones
-- **Proyecciones Mensuales:** Las proyecciones se realizan exclusivamente por **Subcategoría** (monto proyectado, monto real, diferencia y porcentaje consumido).
-- **Comparativo:** Módulo que contrasta el `Monto Proyectado` versus el `Monto Real` ejecutado por Subcategoría, mostrando la Categoría únicamente como encabezado agrupador. Permite detectar desvíos y alertas de sobreconsumo.
+### 3.4. Análisis Comparativo y Proyecciones (Política Opción A)
+- **Proyecciones Mensuales como Presupuesto Puro:** Bajo la **Opción A**, las proyecciones se gestionan como techos y metas presupuestarias de referencia (por Subcategoría). Para los gastos que ingresan bancarizados o por tarjetas, no generan movimientos pendientes automáticos, previniendo duplicados con las importaciones reales.
+- **Comparativo:** Módulo que contrasta el `Monto Proyectado` versus el `Monto Real` ejecutado por Subcategoría (alimentado por los resúmenes importados y los egresos manuales de efectivo), mostrando la Categoría únicamente como encabezado agrupador. Permite detectar desvíos y alertas de sobreconsumo.
 
 ## 4. Arquitectura y Stack Tecnológico
 

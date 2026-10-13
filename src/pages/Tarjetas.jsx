@@ -16,22 +16,32 @@ const Tarjetas = () => {
   const [editingId, setEditingId] = useState(null);
   const [isFixing, setIsFixing] = useState(false);
   const [formData, setFormData] = useState({
-    nombre: '', activa: true
+    nombre: '', activa: true, diaVencimiento: '', diaCierre: ''
   });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const dataToSave = {
+      ...formData,
+      diaVencimiento: formData.diaVencimiento !== '' && formData.diaVencimiento !== null ? Number(formData.diaVencimiento) : null,
+      diaCierre: formData.diaCierre !== '' && formData.diaCierre !== null ? Number(formData.diaCierre) : null
+    };
     if (editingId) {
-      await updateTarjeta(editingId, formData);
+      await updateTarjeta(editingId, dataToSave);
     } else {
-      await addTarjeta(formData);
+      await addTarjeta(dataToSave);
     }
     closeModal();
   };
 
   const handleEdit = (tarjeta) => {
     setEditingId(tarjeta.id);
-    setFormData({ ...tarjeta });
+    setFormData({
+      nombre: tarjeta.nombre || '',
+      activa: tarjeta.activa !== undefined ? tarjeta.activa : true,
+      diaVencimiento: tarjeta.diaVencimiento !== undefined && tarjeta.diaVencimiento !== null ? tarjeta.diaVencimiento : '',
+      diaCierre: tarjeta.diaCierre !== undefined && tarjeta.diaCierre !== null ? tarjeta.diaCierre : ''
+    });
     setIsModalOpen(true);
   };
 
@@ -44,7 +54,7 @@ const Tarjetas = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingId(null);
-    setFormData({ nombre: '', activa: true });
+    setFormData({ nombre: '', activa: true, diaVencimiento: '', diaCierre: '' });
   };
 
   const fixTarjetasData = async () => {
@@ -151,11 +161,23 @@ const Tarjetas = () => {
                   </div>
                   <div>
                     <h3 className="font-bold text-lg">{tarjeta.nombre}</h3>
-                    {!tarjeta.activa && (
-                      <span className="text-[10px] font-bold uppercase text-rose-400">
-                        Inactiva
-                      </span>
-                    )}
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                      {tarjeta.diaVencimiento && (
+                        <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-md">
+                          📅 Vto habitual: día {tarjeta.diaVencimiento}
+                        </span>
+                      )}
+                      {tarjeta.diaCierre && (
+                        <span className="text-[11px] font-medium text-slate-600 bg-slate-100 border border-slate-200/60 px-2 py-0.5 rounded-md">
+                          🔒 Cierre: día {tarjeta.diaCierre}
+                        </span>
+                      )}
+                      {!tarjeta.activa && (
+                        <span className="text-[10px] font-bold uppercase text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                          Inactiva
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -185,6 +207,36 @@ const Tarjetas = () => {
               onChange={(e) => setFormData({...formData, nombre: e.target.value})} 
             />
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">Día habitual de Vencimiento</label>
+              <input 
+                type="number" 
+                min="1" 
+                max="31"
+                className="w-full p-2 border rounded-md bg-background text-sm" 
+                placeholder="Ej: 10"
+                value={formData.diaVencimiento} 
+                onChange={(e) => setFormData({...formData, diaVencimiento: e.target.value})} 
+              />
+              <p className="text-[11px] text-muted-foreground">Día del mes que vence el resumen</p>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">Día habitual de Cierre</label>
+              <input 
+                type="number" 
+                min="1" 
+                max="31"
+                className="w-full p-2 border rounded-md bg-background text-sm" 
+                placeholder="Ej: 25"
+                value={formData.diaCierre} 
+                onChange={(e) => setFormData({...formData, diaCierre: e.target.value})} 
+              />
+              <p className="text-[11px] text-muted-foreground">Opcional, corte del resumen</p>
+            </div>
+          </div>
+
           <div className="flex items-center gap-2 py-2">
             <input 
               type="checkbox" 

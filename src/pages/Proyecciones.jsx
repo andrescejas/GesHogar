@@ -1,17 +1,20 @@
 import { Fragment, useMemo, useState } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { Copy, Plus, Trash2, Edit, Search } from 'lucide-react';
+import { Copy, Plus, Trash2, Edit, Search, ListFilter, Repeat, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
+import { CalendarioVencimientos } from '../components/proyecciones/CalendarioVencimientos';
 import { useData } from '../context/DataContext';
 import { db } from '../lib/firebase';
 import { cn } from '../lib/utils';
 
 const Proyecciones = () => {
   const { categorias, subcategorias, proyecciones, movimientos, saveProyeccion, updateProyeccion, updateMovimiento, deleteProyeccion } = useData();
+  const [modoVista, setModoVista] = useState('proyecciones'); // 'proyecciones' | 'vencimientos'
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
   const [searchTerm, setSearchTerm] = useState('');
+  const [soloRecurrentes, setSoloRecurrentes] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -21,6 +24,7 @@ const Proyecciones = () => {
     descripcion: '',
     responsable: '',
     monto: '',
+    diaVencimiento: '',
     frecuencia: 'Única',
     fechaInicio: new Date().toISOString().substring(0, 10),
     fechaFin: '',
@@ -65,6 +69,7 @@ const Proyecciones = () => {
         descripcion: proyeccion.descripcion || '',
         responsable: proyeccion.responsable || '',
         monto: proyeccion.montoProyectado.toString(),
+        diaVencimiento: proyeccion.diaVencimiento !== undefined && proyeccion.diaVencimiento !== null ? String(proyeccion.diaVencimiento) : '',
         frecuencia: proyeccion.frecuencia || 'Única',
         fechaInicio: proyeccion.fechaInicio || new Date().toISOString().substring(0, 10),
         fechaFin: proyeccion.fechaFin || '',
@@ -78,6 +83,7 @@ const Proyecciones = () => {
         descripcion: '', 
         responsable: '', 
         monto: '',
+        diaVencimiento: '',
         frecuencia: 'Única',
         fechaInicio: new Date(mes + '-01T12:00:00').toISOString().substring(0, 10),
         fechaFin: '',
@@ -104,6 +110,10 @@ const Proyecciones = () => {
         return;
       }
 
+      const diaNum = formData.diaVencimiento !== '' && formData.diaVencimiento !== null
+        ? Number(formData.diaVencimiento)
+        : null;
+
       if (formData.id) {
         let updateFuture = false;
         if (formData.frecuencia !== 'Única' && formData.generarMovimientos) {
@@ -114,6 +124,7 @@ const Proyecciones = () => {
           categoriaId: formData.categoriaId,
           subcategoriaId: formData.subcategoriaId,
           montoProyectado: Number(formData.monto),
+          diaVencimiento: diaNum,
           tipo: cat.tipo,
           descripcion: formData.descripcion,
           responsable: formData.responsable
@@ -136,6 +147,7 @@ const Proyecciones = () => {
           mes, 
           categoriaId: formData.categoriaId, 
           monto: formData.monto, 
+          diaVencimiento: diaNum,
           tipo: cat.tipo, 
           descripcion: formData.descripcion, 
           subcategoriaId: formData.subcategoriaId, 
@@ -149,7 +161,7 @@ const Proyecciones = () => {
       
       setIsModalOpen(false);
       setFormData({ 
-        id: null, categoriaId: '', subcategoriaId: '', descripcion: '', responsable: '', monto: '',
+        id: null, categoriaId: '', subcategoriaId: '', descripcion: '', responsable: '', monto: '', diaVencimiento: '',
         frecuencia: 'Única', fechaInicio: new Date().toISOString().substring(0, 10), fechaFin: '', generarMovimientos: false
       });
       alert('Proyección guardada correctamente');
@@ -214,6 +226,7 @@ const Proyecciones = () => {
           mes,
           categoriaId: d.categoriaId,
           montoProyectado: d.montoProyectado,
+          diaVencimiento: d.diaVencimiento || null,
           tipo: d.tipo,
           descripcion: d.descripcion || '',
           subcategoriaId: subId,
@@ -247,6 +260,11 @@ const Proyecciones = () => {
         (subcategorias.find(s => s.id === p.subcategoriaId)?.nombre.toLowerCase().includes(searchLower));
 
       if (!matchesSearch) return false;
+
+      // Filtro solo recurrentes
+      if (soloRecurrentes) {
+        if ((p.frecuencia || 'Única') === 'Única' && !p.isVirtual) return false;
+      }
 
       if (p.tipo) return p.tipo === tipo;
       const cat = categorias.find(c => c.id === p.categoriaId);
@@ -289,8 +307,13 @@ const Proyecciones = () => {
                     {items.map(p => (
                       <tr key={p.id} className={cn("border-b hover:bg-muted/50 transition-colors", p.isVirtual ? "bg-slate-50/40" : "")}>
                         <td className="p-2 pl-6 font-medium text-indigo-600">
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 flex-wrap">
                             <span>{subcategorias.find(s => s.id === p.subcategoriaId)?.nombre || <span className="text-muted-foreground italic">Sin subcategoría</span>}</span>
+                            {p.diaVencimiento && (
+                              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-1.5 py-0.5 rounded w-max">
+                                📅 Vto: día {p.diaVencimiento}
+                              </span>
+                            )}
                             {p.isVirtual && (
                               <span className={cn(
                                 "inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider",
@@ -338,10 +361,55 @@ const Proyecciones = () => {
 
   return (
     <div className="space-y-6">
+      {/* Selector de modo de vista */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+        <div>
+          <h2 className="text-3xl font-black tracking-tight flex items-center gap-2">
+            Presupuesto Mensual
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            {modoVista === 'vencimientos' 
+              ? 'Agenda cronológica consolidada: boletas fijas y resúmenes de tarjetas para saber cuánto dinero necesitás cada semana.'
+              : 'Gestiona tus ingresos y gastos proyectados para cada mes.'}
+          </p>
+        </div>
+
+        <div className="inline-flex p-1 bg-muted rounded-lg text-xs font-bold w-fit">
+          <button
+            type="button"
+            onClick={() => setModoVista('proyecciones')}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all",
+              modoVista === 'proyecciones' ? "bg-background text-foreground shadow-sm font-extrabold" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <ListFilter className="h-3.5 w-3.5 text-indigo-600" />
+            Presupuesto Mensual
+          </button>
+          <button
+            type="button"
+            onClick={() => setModoVista('vencimientos')}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all",
+              modoVista === 'vencimientos' ? "bg-background text-indigo-700 shadow-sm font-extrabold" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Calendar className="h-3.5 w-3.5 text-indigo-600" />
+            Calendario de Vencimientos
+          </button>
+        </div>
+      </div>
+
+      {modoVista === 'vencimientos' ? (
+        <CalendarioVencimientos 
+          mes={mes} 
+          setMes={setMes} 
+        />
+      ) : (
+        <>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Presupuesto Mensual</h2>
-          <p className="text-muted-foreground">Gestiona tus proyecciones como registros individuales.</p>
+          <p className="text-muted-foreground text-sm">Planifica tus ingresos y gastos para cada mes.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
@@ -360,6 +428,25 @@ const Proyecciones = () => {
             value={mes}
             onChange={(e) => setMes(e.target.value)}
           />
+          <Button
+            type="button"
+            variant={soloRecurrentes ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSoloRecurrentes(!soloRecurrentes)}
+            className={cn(
+              "text-xs font-semibold gap-1.5 transition-all",
+              soloRecurrentes 
+                ? "bg-purple-700 text-white hover:bg-purple-800 border-purple-700 shadow-sm" 
+                : "border-slate-200 text-slate-700 hover:bg-purple-50 hover:text-purple-700"
+            )}
+            title="Mostrar únicamente proyecciones recurrentes"
+          >
+            <Repeat className="h-3.5 w-3.5" />
+            <span>Solo Recurrentes</span>
+            {soloRecurrentes && (
+              <span className="ml-1 px-1.5 py-0.2 text-[9px] bg-purple-900 text-purple-200 rounded-full">On</span>
+            )}
+          </Button>
           <Button variant="outline" size="sm" onClick={duplicarMesAnterior} disabled={loading}>
             <Copy className="mr-2 h-4 w-4" /> Duplicar Anterior
           </Button>
@@ -395,27 +482,29 @@ const Proyecciones = () => {
             <div>
               <p className="text-xs opacity-60 uppercase font-bold">Total Ingresos</p>
               <p className="text-2xl font-bold text-emerald-400">
-                ${proyeccionesList.filter(p => p.tipo === 'ingreso').reduce((acc, p) => acc + (Number(p.montoProyectado) || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${proyeccionesList.filter(p => (p.tipo || categorias.find(c => c.id === p.categoriaId)?.tipo) === 'ingreso').reduce((acc, p) => acc + (Number(p.montoProyectado || p.monto) || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
             <div>
               <p className="text-xs opacity-60 uppercase font-bold">Total Gastos</p>
               <p className="text-2xl font-bold text-rose-400">
-                ${proyeccionesList.filter(p => p.tipo === 'egreso').reduce((acc, p) => acc + (Number(p.montoProyectado) || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${proyeccionesList.filter(p => (p.tipo || categorias.find(c => c.id === p.categoriaId)?.tipo) === 'egreso').reduce((acc, p) => acc + (Number(p.montoProyectado || p.monto) || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
             <div>
               <p className="text-xs opacity-60 uppercase font-bold">Saldo Proyectado</p>
               <p className="text-2xl font-bold text-indigo-400">
                 ${(
-                  proyeccionesList.filter(p => p.tipo === 'ingreso').reduce((acc, p) => acc + (Number(p.montoProyectado) || 0), 0) - 
-                  proyeccionesList.filter(p => p.tipo === 'egreso').reduce((acc, p) => acc + (Number(p.montoProyectado) || 0), 0)
+                  proyeccionesList.filter(p => (p.tipo || categorias.find(c => c.id === p.categoriaId)?.tipo) === 'ingreso').reduce((acc, p) => acc + (Number(p.montoProyectado || p.monto) || 0), 0) - 
+                  proyeccionesList.filter(p => (p.tipo || categorias.find(c => c.id === p.categoriaId)?.tipo) === 'egreso').reduce((acc, p) => acc + (Number(p.montoProyectado || p.monto) || 0), 0)
                 ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
+        </>
+      )}
 
       <Modal 
         isOpen={isModalOpen} 
@@ -465,6 +554,7 @@ const Proyecciones = () => {
               onChange={(e) => setFormData({...formData, responsable: e.target.value})}
             >
               <option value="">Sin asignar</option>
+              <option value="Familia">Familia</option>
               <option value="Andres">Andres</option>
               <option value="Cecilia">Cecilia</option>
               <option value="Agustin">Agustin</option>
@@ -480,16 +570,33 @@ const Proyecciones = () => {
               onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
             />
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Monto Proyectado</label>
-            <input 
-              type="number" 
-              className="w-full p-2 border rounded-md bg-background font-bold" 
-              placeholder="0"
-              required
-              value={formData.monto}
-              onChange={(e) => setFormData({...formData, monto: e.target.value})}
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Monto Proyectado</label>
+              <input 
+                type="number" 
+                className="w-full p-2 border rounded-md bg-background font-bold" 
+                placeholder="0"
+                required
+                value={formData.monto}
+                onChange={(e) => setFormData({...formData, monto: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center justify-between">
+                <span>Día de Vencimiento</span>
+                <span className="text-[11px] text-muted-foreground font-normal">Opcional (1 al 31)</span>
+              </label>
+              <input 
+                type="number" 
+                min="1"
+                max="31"
+                className="w-full p-2 border rounded-md bg-background" 
+                placeholder="Ej: 10"
+                value={formData.diaVencimiento}
+                onChange={(e) => setFormData({...formData, diaVencimiento: e.target.value})}
+              />
+            </div>
           </div>
           </div>
           <div className="flex justify-end gap-3 pt-4">

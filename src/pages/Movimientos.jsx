@@ -1,19 +1,25 @@
-import { useState, useRef, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2 } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { Plus, Search, Edit, Trash2, Upload } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
+import ImportadorModal from '../components/importador/ImportadorModal';
 import { useData } from '../context/DataContext';
 import { cn } from '../lib/utils';
+import { getOrigenCuenta as resolverOrigenCuenta } from '../lib/cuentaHelper';
 
 const Movimientos = () => {
   const { movimientos, categorias, subcategorias, tarjetas, proyecciones, addMovimiento, updateMovimiento, deleteMovimiento, saveProyeccion, updateProyeccion, deleteProyeccion, loading } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTarjetas, setFilterTarjetas] = useState([]);
   const [filterResponsable, setFilterResponsable] = useState('');
-  const [filterEstado, setFilterEstado] = useState('');
+  const [filterTipo, setFilterTipo] = useState('');
+  const [filterSinCategoria, setFilterSinCategoria] = useState('todas');
+  const [filterCategoria, setFilterCategoria] = useState('');
+  const [filterSubcategoria, setFilterSubcategoria] = useState('');
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
   const tarjetasDropdownRef = useRef(null);
@@ -35,11 +41,15 @@ const Movimientos = () => {
     categoriaId: '',
     subcategoriaId: '',
     descripcion: '',
+    comentario: '',
     monto: '',
     responsable: '',
     estado: 'pagado',
     medioPago: 'Efectivo',
     tarjeta: '',
+    cuentaOrigen: 'efectivo',
+    cuentaOrigenLabel: '💵 Efectivo (Manual)',
+    origen: 'manual',
     cantidadCuotas: '1',
     fechaPrimeraCuota: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
     esCuota: false,
@@ -48,9 +58,6 @@ const Movimientos = () => {
     estadoRecurrencia: 'Activa',
     fechaInicioProyeccion: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0]
   });
-
-  const mediosConTarjeta = ['Tarjeta', 'Débito', 'Débito automático'];
-  const usaTarjeta = (medioPago) => mediosConTarjeta.includes(medioPago);
 
   const getTarjeta = (valor) => {
     if (!valor) return null;
@@ -97,12 +104,84 @@ const Movimientos = () => {
 
   const responsables = Array.from(
     new Set([
+      'Familia',
       'Andres',
       'Cecilia',
       'Agustin',
       ...movimientos.map(m => m.responsable).filter(Boolean)
     ])
   ).sort((a, b) => a.localeCompare(b));
+
+  const getOrigenCuenta = useCallback((m) => {
+    return resolverOrigenCuenta(m, tarjetas);
+  }, [tarjetas]);
+
+  const cuentasConMovimientos = useMemo(() => {
+    const movsDelPeriodo = mes ? movimientos.filter(m => m.fecha.startsWith(mes)) : movimientos;
+    const mapa = {};
+    movsDelPeriodo.forEach(m => {
+      const oc = getOrigenCuenta(m);
+      if (!mapa[oc.id]) {
+        mapa[oc.id] = { id: oc.id, label: oc.label, icono: oc.icono, count: 0 };
+      }
+      mapa[oc.id].count++;
+    });
+    return Object.values(mapa).sort((a, b) => b.count - a.count);
+  }, [movimientos, getOrigenCuenta, mes]);
+
+  const opcionesCuentas = useMemo(() => {
+    const list = [
+      { id: 'efectivo', label: '💵 Efectivo (Manual)' }
+    ];
+
+    tarjetas.filter(t => t.activa).forEach(t => {
+      let icono = '💳';
+      const nom = (t.nombre || '').toLowerCase();
+      if (nom.includes('mercado') || nom.includes('meli')) icono = '🔷';
+      else if (nom.includes('bancor') || nom.includes('córdoba') || nom.includes('cordoba')) icono = '🏛️';
+      else if (nom.includes('santander')) icono = '🔴';
+      else if (nom.includes('naranja')) icono = '🟠';
+      list.push({ id: t.id, label: `${icono} ${t.nombre}` });
+    });
+
+    if (formData.cuentaOrigen && !list.some(item => item.id === formData.cuentaOrigen)) {
+      list.push({
+        id: formData.cuentaOrigen,
+        label: formData.cuentaOrigenLabel || formData.cuentaOrigen
+      });
+    }
+
+    return list;
+  }, [tarjetas, formData.cuentaOrigen, formData.cuentaOrigenLabel]);
+
+  const handleTipoFiltroChange = (nuevoTipo) => {
+    setFilterTipo(nuevoTipo);
+    if (nuevoTipo && filterCategoria) {
+      const cat = categorias.find(c => c.id === filterCategoria);
+      if (cat && cat.tipo !== nuevoTipo) {
+        setFilterCategoria('');
+        setFilterSubcategoria('');
+      }
+    }
+  };
+
+  const categoriasParaFiltro = useMemo(() => {
+    if (!filterTipo) return categorias;
+    return categorias.filter(c => c.tipo === filterTipo);
+  }, [categorias, filterTipo]);
+
+  const subcategoriasParaFiltro = useMemo(() => {
+    if (!filterCategoria) return [];
+    return subcategorias.filter(s => s.categoriaId === filterCategoria);
+  }, [subcategorias, filterCategoria]);
+
+  const countSinCategoria = useMemo(() => {
+    const movsDelPeriodo = mes ? movimientos.filter(m => m.fecha.startsWith(mes)) : movimientos;
+    return movsDelPeriodo.filter(m => {
+      if (filterTipo && m.tipo !== filterTipo) return false;
+      return !m.categoriaId || !categorias.some(c => c.id === m.categoriaId);
+    }).length;
+  }, [movimientos, mes, categorias, filterTipo]);
 
   const toggleFilterTarjeta = (tarjetaId) => {
     setFilterTarjetas(prev =>
@@ -112,11 +191,14 @@ const Movimientos = () => {
     );
   };
 
-  const filterTarjetasLabel = filterTarjetas.length === 0
-    ? 'Todas las tarjetas'
-    : filterTarjetas.length === 1
-      ? tarjetas.find(t => t.id === filterTarjetas[0])?.nombre || '1 tarjeta'
-      : `${filterTarjetas.length} tarjetas`;
+  const filterTarjetasLabel = useMemo(() => {
+    if (filterTarjetas.length === 0) return 'Todas las cuentas / tarjetas';
+    if (filterTarjetas.length === 1) {
+      const encontrada = cuentasConMovimientos.find(c => c.id === filterTarjetas[0]);
+      return encontrada ? `${encontrada.icono} ${encontrada.label}` : '1 seleccionada';
+    }
+    return `${filterTarjetas.length} seleccionadas`;
+  }, [filterTarjetas, cuentasConMovimientos]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -127,158 +209,66 @@ const Movimientos = () => {
         return;
       }
 
-    const totalCuotas = Number(formData.cantidadCuotas || 1);
-
-    // Lógica para registrar nueva compra financiada o en 1 cuota con Tarjeta
-    // No aplica a movimientos generados desde proyecciones
-    if (!editingId && formData.medioPago === 'Tarjeta' && formData.tipo === 'egreso' && !formData.proyeccionId) {
-      try {
-        const dataOriginal = {
-          fecha: formData.fecha,
-          tipo: 'egreso',
-          categoriaId: formData.categoriaId,
-          subcategoriaId: formData.subcategoriaId,
-          descripcion: formData.descripcion,
-          monto: Number(formData.monto),
-          responsable: formData.responsable || '',
-          estado: 'pendiente',
-          medioPago: 'Tarjeta',
-          tarjeta: formData.tarjeta,
-          cantidadCuotas: totalCuotas,
-          fechaPrimeraCuota: formData.fechaPrimeraCuota,
-          esCuota: false,
-          contabiliza: false, // Compra de referencia no contabiliza
-          mes: formData.fecha.substring(0, 7),
-          fechaCarga: new Date().toISOString()
-        };
-
-        const originalDoc = await addMovimiento(dataOriginal);
-        const originalId = originalDoc.id;
-
-        // Actualizar el origen con su compraId
-        await updateMovimiento(originalId, { compraId: originalId });
-
-        // Generar cuotas individuales
-        const promesas = [];
-        const cuotaMonto = Number((Number(formData.monto) / totalCuotas).toFixed(2));
-
-        for (let i = 1; i <= totalCuotas; i++) {
-          const baseDate = new Date(formData.fechaPrimeraCuota + 'T00:00:00');
-          baseDate.setMonth(baseDate.getMonth() + (i - 1));
-          const cuotaFecha = baseDate.toISOString().split('T')[0];
-          const cuotaMes = cuotaFecha.substring(0, 7);
-          const mesCuotaDescripcion = formatearMesCuota(cuotaFecha);
-          const descripcionCuota = totalCuotas > 1
-            ? `${formData.descripcion} (Cuota ${i}/${totalCuotas} - ${mesCuotaDescripcion})`
-            : `${formData.descripcion} (Cuota unica - ${mesCuotaDescripcion})`;
-
-          promesas.push(addMovimiento({
-            tipo: 'egreso',
-            categoriaId: formData.categoriaId,
-            subcategoriaId: formData.subcategoriaId,
-            responsable: formData.responsable || '',
-            descripcion: descripcionCuota,
-            monto: cuotaMonto,
-            fecha: cuotaFecha,
-            mes: cuotaMes,
-            estado: 'pendiente',
-            medioPago: 'Tarjeta',
-            tarjeta: formData.tarjeta,
-            esCuota: true,
-            numeroCuota: i,
-            cantidadCuotas: totalCuotas,
-            movimientoOrigenId: originalId,
-            compraId: originalId,
-            contabiliza: true, // Las cuotas sí contabilizan
-            fechaCarga: new Date().toISOString()
-          }));
-        }
-
-        await Promise.all(promesas);
-        alert(`Se guardó la compra con tarjeta y se generaron las cuotas correspondientes.`);
-      } catch (error) {
-        console.error("Error al registrar compra con tarjeta:", error);
-        alert("Error al registrar la compra con tarjeta.");
+      const montoNum = Number(formData.monto);
+      if (!montoNum || montoNum <= 0) {
+        alert('Debes ingresar un monto válido mayor a 0.');
+        return;
       }
-    } else {
-      // Guardado o edición tradicional
+
+      // Resolver cuenta y tarjeta seleccionada
+      let tarjetaFinal = '';
+      let medioPagoFinal = 'Efectivo';
+      let origenFinal = formData.origen || (editingId ? 'manual' : 'manual');
+
+      if (formData.cuentaOrigen === 'efectivo' || formData.cuentaOrigen === 'medio_efectivo') {
+        tarjetaFinal = '';
+        medioPagoFinal = 'Efectivo';
+        origenFinal = 'manual';
+      } else {
+        const tarjetaEncontrada = tarjetas.find(t => t.id === formData.cuentaOrigen);
+        if (tarjetaEncontrada) {
+          tarjetaFinal = tarjetaEncontrada.id;
+          medioPagoFinal = tarjetaEncontrada.nombre;
+          if (!editingId || origenFinal === 'manual') {
+            origenFinal = tarjetaEncontrada.nombre;
+          }
+        } else {
+          tarjetaFinal = formData.cuentaOrigen;
+          medioPagoFinal = formData.cuentaOrigenLabel || formData.cuentaOrigen;
+        }
+      }
+
       const data = {
         fecha: formData.fecha,
         tipo: formData.tipo,
         categoriaId: formData.categoriaId,
         subcategoriaId: formData.subcategoriaId,
-        descripcion: formData.descripcion,
-        monto: Number(formData.monto),
-        responsable: formData.responsable || '',
-        estado: formData.estado,
-        medioPago: formData.medioPago || 'Efectivo',
-        tarjeta: usaTarjeta(formData.medioPago) ? formData.tarjeta : '',
-        cantidadCuotas: (formData.medioPago === 'Tarjeta' && !formData.proyeccionId) ? totalCuotas : 1,
-        fechaPrimeraCuota: (formData.medioPago === 'Tarjeta' && !formData.proyeccionId) ? formData.fechaPrimeraCuota : '',
+        descripcion: (formData.descripcion || '').trim(),
+        comentario: (formData.comentario || '').trim(),
+        monto: montoNum,
+        responsable: formData.responsable || 'Andres',
+        estado: formData.estado || 'pagado',
+        medioPago: medioPagoFinal,
+        tarjeta: tarjetaFinal,
+        etiquetaEspecial: formData.etiquetaEspecial || '',
         esCuota: formData.esCuota || false,
-        fechaPago: formData.estado === 'pagado' ? (formData.fechaPago || formData.fecha) : '',
-        contabiliza: (formData.esCuota === false && formData.medioPago === 'Tarjeta' && !formData.proyeccionId) ? false : (formData.contabiliza !== undefined ? formData.contabiliza : true),
-        mes: formData.fecha.substring(0, 7)
+        fechaPago: formData.estado === 'pagado' ? formData.fecha : (formData.fechaPago || ''),
+        contabiliza: formData.contabiliza !== undefined ? formData.contabiliza : true,
+        mes: formData.fecha.substring(0, 7),
+        origen: origenFinal
       };
 
       if (!editingId) {
         data.fechaCarga = new Date().toISOString();
-      }
-
-      if (editingId) {
-        await updateMovimiento(editingId, data);
-        if (formData.proyeccionId) {
-          const proyeccionExiste = proyecciones.some(p => p.id === formData.proyeccionId);
-          if (proyeccionExiste) {
-            await updateProyeccion(formData.proyeccionId, {
-              frecuencia: formData.frecuencia,
-              fechaInicio: formData.fechaInicioProyeccion,
-              generarMovimientos: formData.frecuencia !== 'Única' && formData.frecuencia !== 'Única (un mes)',
-              estado: formData.estadoRecurrencia || 'Activa',
-              medioPago: formData.medioPago || 'Efectivo',
-              tarjeta: usaTarjeta(formData.medioPago) ? formData.tarjeta : ''
-            });
-          } else {
-            console.warn("La proyección asociada fue eliminada. Se omite su actualización.");
-          }
-        }
-      } else {
         await addMovimiento(data);
+      } else {
+        await updateMovimiento(editingId, data);
       }
-    }
 
-    if (!editingId && formData.tipo === 'egreso' && formData.frecuencia && formData.frecuencia !== 'Única' && formData.frecuencia !== 'Única (un mes)') {
-      try {
-        const fechaInicioProyeccion = getFechaInicioProyeccion(
-          formData.fecha,
-          formData.fechaInicioProyeccion,
-          formData.frecuencia
-        );
-
-        await saveProyeccion({
-          mes: fechaInicioProyeccion.substring(0, 7),
-          categoriaId: formData.categoriaId,
-          subcategoriaId: formData.subcategoriaId,
-          montoProyectado: Number(formData.monto),
-          tipo: 'egreso',
-          descripcion: formData.descripcion,
-          responsable: formData.responsable || '',
-          frecuencia: formData.frecuencia,
-          fechaInicio: fechaInicioProyeccion,
-          fechaFin: '',
-          generarMovimientos: true, // Auto generar a futuro
-          estado: formData.estadoRecurrencia || 'Activa',
-          medioPago: formData.medioPago || 'Efectivo',
-          tarjeta: usaTarjeta(formData.medioPago) ? formData.tarjeta : ''
-        });
-      } catch (err) {
-        console.error("Error al crear la proyección automática:", err);
-      }
-    }
       closeModal();
     } catch (error) {
-      console.error("Error general al guardar:", error);
-      alert("Hubo un error interno al guardar: " + error.message);
+      console.error("Error al guardar movimiento:", error);
+      alert("Hubo un error al guardar: " + error.message);
     }
   };
 
@@ -287,6 +277,8 @@ const Movimientos = () => {
       ? proyecciones.find(p => p.id === m.proyeccionId)
       : null;
 
+    const oc = resolverOrigenCuenta(m, tarjetas);
+
     setEditingId(m.id);
     setFormData({
       fecha: m.fecha,
@@ -294,11 +286,16 @@ const Movimientos = () => {
       categoriaId: m.categoriaId || '',
       subcategoriaId: m.subcategoriaId || '',
       descripcion: m.descripcion || '',
+      comentario: m.comentario || '',
       monto: m.monto,
       responsable: m.responsable || '',
       estado: m.estado === 'proyectado' ? 'pendiente' : m.estado,
       medioPago: m.medioPago || 'Efectivo',
       tarjeta: m.tarjeta || '',
+      cuentaOrigen: m.tarjeta || oc.id,
+      cuentaOrigenLabel: `${oc.icono} ${oc.label}`,
+      origen: m.origen || oc.label,
+      etiquetaEspecial: m.etiquetaEspecial || '',
       cantidadCuotas: m.cantidadCuotas?.toString() || '1',
       fechaPrimeraCuota: m.fechaPrimeraCuota || new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
       esCuota: m.esCuota || false,
@@ -358,28 +355,48 @@ const Movimientos = () => {
       categoriaId: '',
       subcategoriaId: '',
       descripcion: '',
+      comentario: '',
       monto: '',
-      responsable: '',
+      responsable: 'Andres',
       estado: 'pagado',
       medioPago: 'Efectivo',
       tarjeta: '',
-      cantidadCuotas: '1',
-      fechaPrimeraCuota: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+      cuentaOrigen: 'efectivo',
+      cuentaOrigenLabel: '💵 Efectivo (Manual)',
+      origen: 'manual',
+      etiquetaEspecial: '',
       esCuota: false,
       fechaPago: '',
-      proyeccionId: null,
-      frecuencia: 'Única',
-      estadoRecurrencia: 'Activa',
-      fechaInicioProyeccion: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0]
+      proyeccionId: null
     });
   };
 
   const filteredMovimientos = movimientos.filter(m => {
     if (mes && !m.fecha.startsWith(mes)) return false;
-    if (filterTarjetas.length > 0 && !filterTarjetas.includes(getTarjeta(m.tarjeta)?.id)) return false;
+    if (filterTarjetas.length > 0) {
+      const oc = getOrigenCuenta(m);
+      if (!filterTarjetas.includes(oc.id)) return false;
+    }
     if (filterResponsable === '__sin_asignar__' && m.responsable) return false;
     if (filterResponsable && filterResponsable !== '__sin_asignar__' && (m.responsable || '') !== filterResponsable) return false;
-    if (filterEstado && m.estado !== filterEstado) return false;
+
+    // Filtro por tipo
+    if (filterTipo && m.tipo !== filterTipo) return false;
+
+    // Filtro por estado de categorización (aparte)
+    if (filterSinCategoria === 'sin_categoria') {
+      const tieneCat = m.categoriaId && categorias.some(c => c.id === m.categoriaId);
+      if (tieneCat) return false;
+    } else if (filterSinCategoria === 'con_categoria') {
+      const tieneCat = m.categoriaId && categorias.some(c => c.id === m.categoriaId);
+      if (!tieneCat) return false;
+    }
+
+    // Filtro por categoría específica
+    if (filterCategoria && m.categoriaId !== filterCategoria) return false;
+
+    // Filtro por subcategoría específica
+    if (filterSubcategoria && m.subcategoriaId !== filterSubcategoria) return false;
 
     const search = searchTerm.toLowerCase();
     const categoriaNombre = categorias.find(c => c.id === m.categoriaId)?.nombre || '';
@@ -387,6 +404,7 @@ const Movimientos = () => {
     
     return (
       (m.descripcion || '').toLowerCase().includes(search) ||
+      (m.comentario || '').toLowerCase().includes(search) ||
       categoriaNombre.toLowerCase().includes(search) ||
       subcategoriaNombre.toLowerCase().includes(search) ||
       (m.responsable || '').toLowerCase().includes(search) ||
@@ -395,12 +413,9 @@ const Movimientos = () => {
     );
   });
 
-  const totalIngresos = filteredMovimientos.filter(m => m.tipo === 'ingreso').reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
-  const totalEgresos = filteredMovimientos.filter(m => m.tipo === 'egreso' && m.contabiliza !== false).reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
+  const totalIngresos = filteredMovimientos.filter(m => m.tipo === 'ingreso' && m.estado !== 'proyectado' && m.contabiliza !== false).reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
+  const totalEgresos = filteredMovimientos.filter(m => m.tipo === 'egreso' && m.estado !== 'proyectado' && m.contabiliza !== false).reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
   const saldo = totalIngresos - totalEgresos;
-  const showTarjetaPanel = formData.medioPago === 'Tarjeta' && formData.tipo === 'egreso' && !formData.esCuota && !formData.proyeccionId;
-  const showRecurrenciaPanel = (!editingId || formData.proyeccionId) && formData.tipo === 'egreso' && (formData.medioPago !== 'Tarjeta' || formData.proyeccionId);
-  const showRightPanel = showTarjetaPanel || showRecurrenciaPanel;
 
   const hoy = new Date().toISOString().split('T')[0];
   const movimientosManuales = movimientos.filter(m => 
@@ -435,10 +450,20 @@ const Movimientos = () => {
             </p>
           )}
         </div>
-        <Button className="flex items-center gap-2" onClick={() => setIsModalOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Nuevo Movimiento
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button 
+            variant="outline" 
+            className="flex items-center gap-2 border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800 font-semibold shadow-xs" 
+            onClick={() => setIsImportModalOpen(true)}
+          >
+            <Upload className="h-4 w-4 text-indigo-600" />
+            Importar Resumen
+          </Button>
+          <Button className="flex items-center gap-2" onClick={() => setIsModalOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Nuevo (Efectivo)
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3 mb-6">
@@ -470,31 +495,55 @@ const Movimientos = () => {
             <CardTitle>Historial de Transacciones</CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
               <details ref={tarjetasDropdownRef} className="relative">
-                <summary className="list-none [&::-webkit-details-marker]:hidden p-2 border rounded-md bg-background text-sm font-medium cursor-pointer min-w-[180px] flex items-center justify-between gap-3">
+                <summary className="list-none [&::-webkit-details-marker]:hidden p-2 border rounded-md bg-background text-sm font-medium cursor-pointer min-w-[200px] flex items-center justify-between gap-3">
                   <span className="truncate">{filterTarjetasLabel}</span>
                   <span className="text-xs text-muted-foreground">▾</span>
                 </summary>
-                <div className="absolute right-0 z-20 mt-2 w-64 rounded-md border bg-background shadow-lg p-2">
+                <div className="absolute right-0 z-20 mt-2 w-72 rounded-md border bg-background shadow-lg p-2">
+                  <div className="flex items-center justify-between px-2 py-1">
+                    <span className="text-[11px] font-bold text-muted-foreground uppercase">Cuentas con movimientos</span>
+                    {filterTarjetas.length > 0 && (
+                      <button
+                        type="button"
+                        className="text-xs text-indigo-600 font-semibold hover:underline"
+                        onClick={() => setFilterTarjetas([])}
+                      >
+                        Limpiar ({filterTarjetas.length})
+                      </button>
+                    )}
+                  </div>
                   <button
                     type="button"
-                    className="w-full text-left px-2 py-1.5 rounded text-sm font-medium hover:bg-accent"
+                    className="w-full text-left px-2 py-1.5 rounded text-sm font-medium hover:bg-accent flex items-center justify-between"
                     onClick={() => setFilterTarjetas([])}
                   >
-                    Todas las tarjetas
+                    <span>Todas las cuentas / tarjetas</span>
+                    <span className="text-xs text-muted-foreground font-mono">
+                      ({mes ? movimientos.filter(m => m.fecha.startsWith(mes)).length : movimientos.length})
+                    </span>
                   </button>
                   <div className="my-1 border-t" />
                   <div className="max-h-64 overflow-auto space-y-1">
-                    {tarjetas.filter(t => t.activa).map(t => (
-                      <label key={t.id} className="flex items-center gap-2 px-2 py-1.5 rounded text-sm cursor-pointer hover:bg-accent">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4"
-                          checked={filterTarjetas.includes(t.id)}
-                          onChange={() => toggleFilterTarjeta(t.id)}
-                        />
-                        <span className="truncate">{t.nombre}</span>
-                      </label>
-                    ))}
+                    {cuentasConMovimientos.length === 0 ? (
+                      <p className="p-3 text-xs text-muted-foreground text-center">No hay movimientos en este período</p>
+                    ) : (
+                      cuentasConMovimientos.map(cuenta => (
+                        <label key={cuenta.id} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded text-sm cursor-pointer hover:bg-accent">
+                          <div className="flex items-center gap-2 truncate">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-slate-300"
+                              checked={filterTarjetas.includes(cuenta.id)}
+                              onChange={() => toggleFilterTarjeta(cuenta.id)}
+                            />
+                            <span className="truncate">{cuenta.icono} {cuenta.label}</span>
+                          </div>
+                          <span className="text-xs font-mono text-muted-foreground shrink-0 bg-slate-100 px-1.5 py-0.5 rounded font-semibold">
+                            {cuenta.count}
+                          </span>
+                        </label>
+                      ))
+                    )}
                   </div>
                 </div>
               </details>
@@ -509,22 +558,79 @@ const Movimientos = () => {
                   <option key={responsable} value={responsable}>{responsable}</option>
                 ))}
               </select>
+              {/* 1. Filtro Tipo */}
               <select
-                className="p-2 border rounded-md bg-background text-sm font-medium"
-                value={filterEstado}
-                onChange={(e) => setFilterEstado(e.target.value)}
+                className="p-2 border rounded-md bg-background text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20"
+                value={filterTipo}
+                onChange={(e) => handleTipoFiltroChange(e.target.value)}
               >
-                <option value="">Todos los estados</option>
-                <option value="pagado">Pagado</option>
-                <option value="pendiente">Pendiente</option>
-                <option value="proyectado">Proyectado</option>
+                <option value="">Todos los tipos</option>
+                <option value="egreso">Egresos (Gastos)</option>
+                <option value="ingreso">Ingresos</option>
               </select>
+
+              {/* 2. Filtro Categoría */}
+              <select
+                className="p-2 border rounded-md bg-background text-sm font-medium disabled:opacity-50 outline-none focus:ring-2 focus:ring-primary/20"
+                value={filterCategoria}
+                onChange={(e) => {
+                  setFilterCategoria(e.target.value);
+                  setFilterSubcategoria('');
+                  if (e.target.value && filterSinCategoria === 'sin_categoria') {
+                    setFilterSinCategoria('todas');
+                  }
+                }}
+                disabled={filterSinCategoria === 'sin_categoria'}
+              >
+                <option value="">
+                  {filterTipo === 'egreso' ? 'Todas las categorías de gasto' : (filterTipo === 'ingreso' ? 'Todas las categorías de ingreso' : 'Todas las categorías')}
+                </option>
+                {filterTipo ? (
+                  categoriasParaFiltro.map(categoria => (
+                    <option key={categoria.id} value={categoria.id}>
+                      {categoria.icono} {categoria.nombre}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <optgroup label="── Egresos (Gastos) ──">
+                      {categorias.filter(c => c.tipo !== 'ingreso').map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.icono} {c.nombre}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="── Ingresos ──">
+                      {categorias.filter(c => c.tipo === 'ingreso').map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.icono} {c.nombre}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </>
+                )}
+              </select>
+
+              {/* 3. Filtro Subcategoría */}
+              <select
+                className="p-2 border rounded-md bg-background text-sm font-medium disabled:opacity-50 outline-none focus:ring-2 focus:ring-primary/20"
+                value={filterSubcategoria}
+                onChange={(e) => setFilterSubcategoria(e.target.value)}
+                disabled={!filterCategoria || filterSinCategoria === 'sin_categoria'}
+              >
+                <option value="">Todas las subcategorías</option>
+                {subcategoriasParaFiltro.map(sub => (
+                  <option key={sub.id} value={sub.id}>{sub.nombre}</option>
+                ))}
+              </select>
+
               <input 
                 type="month" 
                 className="p-2 border rounded-md bg-background text-sm font-medium"
                 value={mes}
                 onChange={(e) => setMes(e.target.value)}
               />
+
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <input
@@ -535,6 +641,29 @@ const Movimientos = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+
+              {/* 4. Filtro Aparte: Sin Categoría (al final y abajo) */}
+              <select
+                className={cn(
+                  "p-2 border rounded-md bg-background text-sm font-medium outline-none transition-colors",
+                  filterSinCategoria === 'sin_categoria' && "border-amber-400 bg-amber-50 text-amber-900 font-bold ring-1 ring-amber-400"
+                )}
+                value={filterSinCategoria}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFilterSinCategoria(val);
+                  if (val === 'sin_categoria') {
+                    setFilterCategoria('');
+                    setFilterSubcategoria('');
+                  }
+                }}
+              >
+                <option value="todas">Todas las categorías</option>
+                <option value="sin_categoria" className="font-semibold text-amber-700">
+                  Sin categoría {countSinCategoria > 0 ? `(${countSinCategoria})` : ''}
+                </option>
+                <option value="con_categoria">Con categoría</option>
+              </select>
             </div>
           </div>
         </CardHeader>
@@ -567,9 +696,23 @@ const Movimientos = () => {
                         )}>
                           {m.tipo}
                         </span>
-                        {m.medioPago && (
-                          <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold w-max uppercase tracking-wider">
-                            {m.medioPago}
+                        {(() => {
+                          const oc = getOrigenCuenta(m);
+                          return (
+                            <span className="text-[10px] bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded font-bold w-max tracking-wide flex items-center gap-1">
+                              <span>{oc.icono}</span>
+                              <span>{oc.label}</span>
+                            </span>
+                          );
+                        })()}
+                        {m.etiquetaEspecial && (
+                          <span className={cn(
+                            "text-[10px] px-1.5 py-0.5 rounded font-bold w-max uppercase tracking-wider",
+                            m.etiquetaEspecial === 'Débito Automático'
+                              ? "bg-amber-100 text-amber-800 border border-amber-200"
+                              : "bg-slate-200 text-slate-700"
+                          )}>
+                            {m.etiquetaEspecial === 'Débito Automático' ? '🔄 ' : '🛡️ '}{m.etiquetaEspecial}
                           </span>
                         )}
                         {(m.proyeccionId || m.esRecurrenteAuto) && (
@@ -580,16 +723,29 @@ const Movimientos = () => {
                       </div>
                     </td>
                     <td className="p-4 align-middle whitespace-nowrap">
-                      {categorias.find(c => c.id === m.categoriaId)?.icono} {categorias.find(c => c.id === m.categoriaId)?.nombre || 'Sin categoría'}
+                      {categorias.find(c => c.id === m.categoriaId) ? (
+                        <span>
+                          {categorias.find(c => c.id === m.categoriaId)?.icono} {categorias.find(c => c.id === m.categoriaId)?.nombre}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs text-amber-800 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full font-semibold">
+                          ⚠️ Sin categoría
+                        </span>
+                      )}
                     </td>
                     <td className="p-4 align-middle">
                       {subcategorias.find(s => s.id === m.subcategoriaId)?.nombre || '-'}
                     </td>
-                    <td className="p-4 align-middle max-w-[200px] truncate" title={m.descripcion}>
+                    <td className="p-4 align-middle max-w-[220px]" title={m.descripcion}>
                       <div className="flex flex-col gap-0.5">
                         <span className={cn("font-medium", m.contabiliza === false ? "font-normal text-slate-400" : "")}>
                           {m.descripcion}
                         </span>
+                        {m.comentario && (
+                          <span className="text-[11px] text-indigo-700 italic bg-indigo-50/80 border border-indigo-200/60 rounded px-1.5 py-0.5 w-max line-clamp-2" title={m.comentario}>
+                            💬 {m.comentario}
+                          </span>
+                        )}
                         {m.tarjeta && (
                             <span className="text-[10px] text-indigo-500 font-bold uppercase tracking-wide">
                               💳 {getTarjeta(m.tarjeta)?.nombre || m.tarjeta}
@@ -612,8 +768,8 @@ const Movimientos = () => {
                           <span className="line-through text-slate-400 font-normal">
                             ${(Number(m.monto) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
-                          <span className="text-[9px] text-slate-500 font-bold bg-slate-100 px-1 py-0.5 rounded mt-0.5 uppercase tracking-wider">
-                            Informativo
+                          <span className="text-[9px] text-slate-600 font-bold bg-slate-200/80 px-1 py-0.5 rounded mt-0.5 uppercase tracking-wider">
+                            {m.etiquetaEspecial || 'Informativo'}
                           </span>
                         </div>
                       ) : (
@@ -651,306 +807,205 @@ const Movimientos = () => {
       <Modal 
         isOpen={isModalOpen} 
         onClose={closeModal} 
-        title={editingId ? "Editar Movimiento" : "Nuevo Movimiento"}
-        maxWidth={showRightPanel ? "max-w-4xl" : "max-w-lg"}
+        title={editingId ? "Editar Movimiento" : "Nuevo Movimiento (Efectivo / Manual)"}
+        maxWidth="max-w-lg"
       >
-        <form onSubmit={handleSubmit}>
-          <div className={cn("gap-6", showRightPanel ? "grid lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]" : "flex flex-col gap-4")}>
-
-            {/* --- Columna Izquierda / Campos Base --- */}
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Fecha</label>
-                  <input type="date" className="w-full p-2 border rounded-md bg-background text-sm" required value={formData.fecha} onChange={(e) => setFormData({...formData, fecha: e.target.value})} />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Tipo</label>
-                  <select className="w-full p-2 border rounded-md bg-background text-sm" value={formData.tipo} onChange={(e) => setFormData({...formData, tipo: e.target.value})} disabled={!!formData.proyeccionId}>
-                    <option value="ingreso">Ingreso</option>
-                    <option value="egreso">Egreso</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Categoría</label>
-                <select 
-                  className="w-full p-2 border rounded-md bg-background text-sm" 
-                  required 
-                  value={formData.categoriaId} 
-                  onChange={(e) => setFormData({...formData, categoriaId: e.target.value})}
-                  disabled={!!formData.proyeccionId}
-                >
-                  <option value="">Seleccionar categoría...</option>
-                  {categorias
-                    .filter(c => c.tipo.toLowerCase() === formData.tipo.toLowerCase())
-                    .map(c => (
-                      <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
-                    ))
-                  }
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Subcategoría</label>
-                <select 
-                  className="w-full p-2 border rounded-md bg-background text-sm" 
-                  required
-                  value={formData.subcategoriaId} 
-                  onChange={(e) => setFormData({...formData, subcategoriaId: e.target.value})}
-                  disabled={!formData.categoriaId || !!formData.proyeccionId}
-                >
-                  <option value="">Seleccionar subcategoría...</option>
-                  {subcategorias
-                    .filter(s => s.categoriaId === formData.categoriaId)
-                    .map(s => (
-                      <option key={s.id} value={s.id}>{s.nombre}</option>
-                    ))
-                  }
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Descripción</label>
-                <input type="text" className="w-full p-2 border rounded-md bg-background text-sm" required value={formData.descripcion} onChange={(e) => setFormData({...formData, descripcion: e.target.value})} />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Monto</label>
-                  <input type="number" className="w-full p-2 border rounded-md bg-background text-sm" required value={formData.monto} onChange={(e) => setFormData({...formData, monto: e.target.value})} />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Responsable</label>
-                  <select 
-                    className="w-full p-2 border rounded-md bg-background text-sm" 
-                    value={formData.responsable} 
-                    onChange={(e) => setFormData({...formData, responsable: e.target.value})}
-                  >
-                    <option value="">Sin asignar</option>
-                    <option value="Andres">Andres</option>
-                    <option value="Cecilia">Cecilia</option>
-                    <option value="Agustin">Agustin</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Medio de Pago</label>
-                  <select 
-                    className="w-full p-2 border rounded-md bg-background text-sm" 
-                    required
-                    disabled={editingId && formData.esCuota}
-                    value={formData.medioPago || 'Efectivo'} 
-                    onChange={(e) => {
-                      const mp = e.target.value;
-                      const isDebitoAutomatico = mp === 'Débito automático';
-                      setFormData({
-                        ...formData,
-                        medioPago: mp,
-                        tarjeta: '',
-                        cantidadCuotas: '1',
-                        frecuencia: mp === 'Tarjeta' ? 'Única' : (isDebitoAutomatico ? 'Mensual' : formData.frecuencia),
-                        estado: mp === 'Tarjeta' ? 'pendiente' : formData.estado
-                      });
-                    }}
-                  >
-                    <option value="Efectivo">Efectivo</option>
-                    <option value="Débito">Débito</option>
-                    <option value="Débito automático">Débito automático</option>
-                    <option value="Transferencia">Transferencia</option>
-                    <option value="Tarjeta">Tarjeta</option>
-                    <option value="Billetera virtual">Billetera virtual</option>
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">
-                    Estado
-                    {formData.medioPago === 'Tarjeta' && (
-                      <span className="ml-1.5 text-[10px] text-amber-600 font-bold uppercase tracking-wide bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                        Auto
-                      </span>
-                    )}
-                  </label>
-                  <select 
-                    className={cn("w-full p-2 border rounded-md bg-background text-sm", formData.medioPago === 'Tarjeta' ? "text-amber-700 font-semibold border-amber-300 bg-amber-50/30" : "")}
-                    value={formData.estado} 
-                    onChange={(e) => {
-                      const nuevoEstado = e.target.value;
-                      setFormData({
-                        ...formData, 
-                        estado: nuevoEstado,
-                        fechaPago: nuevoEstado === 'pagado' ? (formData.fechaPago || new Date().toISOString().split('T')[0]) : ''
-                      });
-                    }}
-                  >
-                    <option value="pagado">Pagado</option>
-                    <option value="pendiente">Pendiente</option>
-                  </select>
-                </div>
-                {formData.estado === 'pagado' && (
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Fecha de Pago</label>
-                    <input 
-                      type="date" 
-                      className="w-full p-2 border rounded-md bg-background text-sm" 
-                      value={formData.fechaPago || ''} 
-                      onChange={(e) => setFormData({...formData, fechaPago: e.target.value})} 
-                    />
-                  </div>
-                )}
-              </div>
-
-              {(formData.medioPago === 'Débito' || formData.medioPago === 'Débito automático' || (formData.medioPago === 'Tarjeta' && formData.proyeccionId)) && (
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Tarjeta</label>
-                  <select
-                    className="w-full p-2 border rounded-md bg-background text-sm"
-                    required
-                    value={formData.tarjeta || ''}
-                    onChange={(e) => setFormData({ ...formData, tarjeta: e.target.value })}
-                  >
-                    <option value="">Seleccionar tarjeta...</option>
-                    {tarjetas && tarjetas.filter(t => t.activa).map(t => (
-                      <option key={t.id} value={t.id}>{t.nombre}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {editingId && formData.proyeccionId && (
-                <div className="p-2.5 bg-violet-50 border border-violet-200 rounded-md text-xs text-violet-800 font-medium">
-                  🔄 Movimiento generado automáticamente desde una proyección recurrente. Tipo, categoría y subcategoría no son editables.
-                </div>
-              )}
-              {editingId && formData.esCuota && (
-                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 font-medium">
-                  Estas editando una cuota individual. Para cambiar la financiacion completa, elimina esta compra y vuelve a cargarla.
-                </div>
-              )}
-
+        <form onSubmit={handleSubmit} className="space-y-4 pt-1">
+          {/* 1. Monto prominente */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Monto</label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold text-xl">$</span>
+              <input 
+                type="number" 
+                step="any"
+                placeholder="0.00"
+                className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-2xl font-black text-slate-900 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all" 
+                required 
+                value={formData.monto} 
+                onChange={(e) => setFormData({...formData, monto: e.target.value})} 
+                autoFocus={!editingId}
+              />
             </div>
-
-            {showRightPanel && (
-              <div className="flex flex-col gap-3">
-                {showTarjetaPanel && (
-                  <div className="flex flex-col gap-3 p-4 bg-indigo-50/40 border border-indigo-100 rounded-xl">
-                    <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
-                      💳 Detalles de Tarjeta
-                    </p>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-slate-700">Nombre de la Tarjeta</label>
-                      <select
-                        className="w-full p-2 border rounded-md bg-background text-sm"
-                        required={formData.medioPago === 'Tarjeta' && !formData.esCuota}
-                        value={formData.tarjeta || ''}
-                        onChange={(e) => setFormData({...formData, tarjeta: e.target.value})}
-                      >
-                        <option value="">Seleccionar tarjeta...</option>
-                        {tarjetas && tarjetas.filter(t => t.activa).map(t => (
-                          <option key={t.id} value={t.id}>{t.nombre}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-slate-700">Cantidad de Cuotas</label>
-                      <input
-                        type="number"
-                        min="1"
-                        placeholder="1"
-                        className="w-full p-2 border rounded-md bg-background text-sm font-medium"
-                        required={formData.medioPago === 'Tarjeta' && !formData.esCuota}
-                        value={formData.cantidadCuotas || '1'}
-                        onChange={(e) => setFormData({...formData, cantidadCuotas: e.target.value})}
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-slate-700">Fecha 1er Vencimiento</label>
-                      <input
-                        type="date"
-                        className="w-full p-2 border rounded-md bg-background text-sm font-medium"
-                        required={formData.medioPago === 'Tarjeta' && !formData.esCuota}
-                        value={formData.fechaPrimeraCuota || ''}
-                        onChange={(e) => setFormData({...formData, fechaPrimeraCuota: e.target.value})}
-                      />
-                    </div>
-
-                    {formData.monto && formData.fechaPrimeraCuota && (
-                      <div className="p-2.5 bg-indigo-100/60 rounded-md text-xs text-indigo-900 font-medium leading-relaxed mt-auto">
-                        {Number(formData.cantidadCuotas) > 1 ? (
-                          <span>💡 Referencia informativa + <span className="font-bold">{formData.cantidadCuotas}</span> cuotas de <span className="font-bold">${(Number(formData.monto) / Number(formData.cantidadCuotas)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> desde <span className="font-bold">{new Date(formData.fechaPrimeraCuota + 'T00:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</span>.</span>
-                        ) : (
-                          <span>💡 Referencia informativa + <span className="font-bold">1 cuota Única</span> de <span className="font-bold">${(Number(formData.monto)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> en <span className="font-bold">{new Date(formData.fechaPrimeraCuota + 'T00:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</span>.</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {showRecurrenciaPanel && (
-                  <div className="flex flex-col gap-3 p-4 bg-violet-50/40 border border-violet-100 rounded-xl">
-                    <p className="text-xs font-bold text-violet-700 uppercase tracking-wider flex items-center gap-1.5">
-                      🔄 RECURRENCIA (Proyección Automática)
-                    </p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium">Frecuencia</label>
-                        <select
-                          className="w-full p-2 border rounded-md bg-white border-violet-200 text-sm focus:ring-violet-500"
-                          value={formData.frecuencia || 'Única'}
-                          onChange={(e) => setFormData({ ...formData, frecuencia: e.target.value })}
-                        >
-                          <option value="Única">Única (un mes)</option>
-                          <option value="Mensual">Mensual</option>
-                          <option value="Bimestral">Bimestral</option>
-                          <option value="Trimestral">Trimestral</option>
-                          <option value="Semestral">Semestral</option>
-                          <option value="Anual">Anual</option>
-                        </select>
-                      </div>
-                      {formData.frecuencia && formData.frecuencia !== 'Única' && formData.frecuencia !== 'Única (un mes)' && (
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium">Estado</label>
-                          <select
-                            className="w-full p-2 border rounded-md bg-white border-violet-200 text-sm focus:ring-violet-500"
-                            value={formData.estadoRecurrencia || 'Activa'}
-                            onChange={(e) => setFormData({ ...formData, estadoRecurrencia: e.target.value })}
-                          >
-                            <option value="Activa">Activa</option>
-                            <option value="Inactiva">Inactiva (pausada)</option>
-                          </select>
-                        </div>
-                      )}
-                      {formData.frecuencia && formData.frecuencia !== 'Única' && formData.frecuencia !== 'Única (un mes)' && (
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium">Siguiente Cobro</label>
-                          <input
-                            type="date"
-                            className="w-full p-2 border rounded-md bg-white border-violet-200 text-sm focus:ring-violet-500"
-                            value={formData.fechaInicioProyeccion || formData.fecha}
-                            onChange={(e) => setFormData({ ...formData, fechaInicioProyeccion: e.target.value })}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
           </div>
 
-          <div className="flex justify-end gap-3 pt-5 mt-2 border-t">
-            <Button variant="outline" type="button" onClick={closeModal}>Cancelar</Button>
-            <Button type="submit">{editingId ? "Guardar Cambios" : "Crear Movimiento"}</Button>
+          {/* 2. Descripción y Aclaración */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-700">Descripción</label>
+            <input 
+              type="text" 
+              placeholder="Ej: Verdulería feria, Café, Taxi, etc." 
+              className="w-full p-2.5 border border-slate-200 rounded-xl bg-background text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+              required 
+              value={formData.descripcion} 
+              onChange={(e) => setFormData({...formData, descripcion: e.target.value})} 
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-700">Aclaración / Comentario (Opcional)</label>
+            <input 
+              type="text" 
+              placeholder="Ej: Aclaración, detalle de compra o notas..." 
+              className="w-full p-2.5 border border-slate-200 rounded-xl bg-background text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+              value={formData.comentario || ''} 
+              onChange={(e) => setFormData({...formData, comentario: e.target.value})} 
+            />
+          </div>
+
+          {/* 3. Categoría y Subcategoría */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">Categoría</label>
+              <select 
+                className="w-full p-2.5 border border-slate-200 rounded-xl bg-background text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                required 
+                value={formData.categoriaId} 
+                onChange={(e) => setFormData({...formData, categoriaId: e.target.value, subcategoriaId: ''})}
+                disabled={!!formData.proyeccionId}
+              >
+                <option value="">Seleccionar categoría...</option>
+                {categorias
+                  .filter(c => c.tipo.toLowerCase() === formData.tipo.toLowerCase())
+                  .map(c => (
+                    <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
+                  ))
+                }
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">Subcategoría</label>
+              <select 
+                className="w-full p-2.5 border border-slate-200 rounded-xl bg-background text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                required
+                value={formData.subcategoriaId} 
+                onChange={(e) => setFormData({...formData, subcategoriaId: e.target.value})}
+                disabled={!formData.categoriaId || !!formData.proyeccionId}
+              >
+                <option value="">Seleccionar subcategoría...</option>
+                {subcategorias
+                  .filter(s => s.categoriaId === formData.categoriaId)
+                  .map(s => (
+                    <option key={s.id} value={s.id}>{s.nombre}</option>
+                  ))
+                }
+              </select>
+            </div>
+          </div>
+
+          {/* 4. Fecha y Tipo */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">Fecha</label>
+              <input 
+                type="date" 
+                className="w-full p-2.5 border border-slate-200 rounded-xl bg-background text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                required 
+                value={formData.fecha} 
+                onChange={(e) => setFormData({...formData, fecha: e.target.value})} 
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">Tipo</label>
+              <select 
+                className="w-full p-2.5 border border-slate-200 rounded-xl bg-background text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                value={formData.tipo} 
+                onChange={(e) => setFormData({...formData, tipo: e.target.value, categoriaId: '', subcategoriaId: ''})} 
+                disabled={!!formData.proyeccionId}
+              >
+                <option value="egreso">Egreso (Gasto)</option>
+                <option value="ingreso">Ingreso</option>
+              </select>
+            </div>
+          </div>
+
+          {/* 5. Responsable (Chips de 1 clic) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-700">Responsable</label>
+            <div className="flex gap-2">
+              {['Familia', 'Andres', 'Cecilia', 'Agustin'].map((resp) => {
+                const isSelected = (formData.responsable || 'Andres') === resp;
+                return (
+                  <button
+                    key={resp}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, responsable: resp })}
+                    className={cn(
+                      "flex-1 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer",
+                      isSelected 
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-sm" 
+                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                    )}
+                  >
+                    {resp}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 6. Cuenta / Tarjeta de Origen y Estado */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">Cuenta / Tarjeta de Origen</label>
+              <select 
+                className="w-full p-2.5 border border-slate-200 rounded-xl bg-background text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                value={formData.cuentaOrigen || 'efectivo'} 
+                onChange={(e) => {
+                  const selVal = e.target.value;
+                  const selObj = opcionesCuentas.find(o => o.id === selVal);
+                  setFormData({ 
+                    ...formData, 
+                    cuentaOrigen: selVal,
+                    cuentaOrigenLabel: selObj ? selObj.label : selVal
+                  });
+                }}
+              >
+                {opcionesCuentas.map(op => (
+                  <option key={op.id} value={op.id}>{op.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">Estado</label>
+              <select 
+                className="w-full p-2.5 border border-slate-200 rounded-xl bg-background text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                value={formData.estado || 'pagado'} 
+                onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+              >
+                <option value="pagado">Pagado</option>
+                <option value="pendiente">Pendiente</option>
+              </select>
+            </div>
+          </div>
+
+          {formData.estado === 'pendiente' && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">Fecha Estimada de Pago</label>
+              <input 
+                type="date" 
+                className="w-full p-2.5 border border-slate-200 rounded-xl bg-background text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                value={formData.fechaPago || ''} 
+                onChange={(e) => setFormData({ ...formData, fechaPago: e.target.value })} 
+              />
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+            <Button variant="outline" type="button" onClick={closeModal} className="rounded-xl">
+              Cancelar
+            </Button>
+            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm px-6 font-semibold">
+              {editingId ? "Guardar Cambios" : "Guardar Movimiento"}
+            </Button>
           </div>
         </form>
       </Modal>
+
+      <ImportadorModal 
+        isOpen={isImportModalOpen} 
+        onClose={() => setIsImportModalOpen(false)} 
+      />
     </div>
   );
 };

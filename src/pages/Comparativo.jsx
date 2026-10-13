@@ -22,13 +22,15 @@ const Comparativo = () => {
       const proyFisica = proyecciones
         .filter(p => {
           const matchCat = p.categoriaId === cat.id;
-          const matchSub = isSinSub ? !p.subcategoriaId : p.subcategoriaId === sub.id;
+          const matchSub = isSinSub 
+            ? (!p.subcategoriaId || !subsCat.some(s => s.id === p.subcategoriaId)) 
+            : p.subcategoriaId === sub.id;
           if (!matchCat || !matchSub) return false;
           const freq = p.frecuencia || 'Única';
           if (freq === 'Única') return p.mes === mes;
           return proyeccionAplicaEnMes(p, mes);
         })
-        .reduce((acc, p) => acc + (Number(p.montoProyectado) || 0), 0);
+        .reduce((acc, p) => acc + Number(p.montoProyectado !== undefined && p.montoProyectado !== null ? p.montoProyectado : (p.monto || 0)), 0);
         
       const proy = proyFisica;
         
@@ -38,7 +40,7 @@ const Comparativo = () => {
           (m.categoriaId === cat.id || m.categoria === cat.nombre) && 
           m.fecha.startsWith(mes) && 
           m.estado !== 'proyectado' && 
-          (isSinSub ? !m.subcategoriaId : m.subcategoriaId === sub.id) &&
+          (isSinSub ? (!m.subcategoriaId || !subsCat.some(s => s.id === m.subcategoriaId)) : m.subcategoriaId === sub.id) &&
           m.contabiliza !== false
         )
         .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);

@@ -9,7 +9,8 @@ import { cn } from '../lib/utils';
 const Categorias = () => {
   const { 
     categorias, addCategoria, updateCategoria, deleteCategoria,
-    subcategorias, addSubcategoria, updateSubcategoria, deleteSubcategoria
+    subcategorias, addSubcategoria, updateSubcategoria, deleteSubcategoria,
+    movimientos, proyecciones
   } = useData();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -40,6 +41,34 @@ const Categorias = () => {
     closeCatModal();
   };
 
+  const handleDeleteCategoria = async (cat) => {
+    const movsAfectados = (movimientos || []).filter(m => m.categoriaId === cat.id || m.categoria === cat.nombre);
+    const proysAfectadas = (proyecciones || []).filter(p => p.categoriaId === cat.id);
+    
+    let mensaje = `¿Estás seguro de eliminar la categoría "${cat.nombre}"?`;
+    if (movsAfectados.length > 0 || proysAfectadas.length > 0) {
+      mensaje = `⚠️ ATENCIÓN: Esta categoría tiene ${movsAfectados.length} movimiento(s) y ${proysAfectadas.length} proyección(es) vinculados.\nSi la eliminas, quedarán sin categoría asociada.\n\n¿Deseas continuar y eliminar "${cat.nombre}"?`;
+    }
+
+    if (window.confirm(mensaje)) {
+      await deleteCategoria(cat.id);
+    }
+  };
+
+  const handleDeleteSubcategoria = async (sub) => {
+    const movsAfectados = (movimientos || []).filter(m => m.subcategoriaId === sub.id || m.subcategoria === sub.nombre);
+    const proysAfectadas = (proyecciones || []).filter(p => p.subcategoriaId === sub.id);
+    
+    let mensaje = `¿Estás seguro de eliminar la subcategoría "${sub.nombre}"?`;
+    if (movsAfectados.length > 0 || proysAfectadas.length > 0) {
+      mensaje = `⚠️ ATENCIÓN: Esta subcategoría tiene ${movsAfectados.length} movimiento(s) y ${proysAfectadas.length} proyección(es) vinculados.\n\n¿Deseas continuar y eliminar "${sub.nombre}"?`;
+    }
+
+    if (window.confirm(mensaje)) {
+      await deleteSubcategoria(sub.id);
+    }
+  };
+
   const handleCatEdit = (cat) => {
     setEditingCatId(cat.id);
     setCatFormData({ ...cat });
@@ -65,7 +94,11 @@ const Categorias = () => {
 
   const handleSubEdit = (sub) => {
     setEditingSubId(sub.id);
-    setSubFormData({ ...sub });
+    setSubFormData({
+      nombre: sub.nombre || '',
+      categoriaId: sub.categoriaId || '',
+      activa: sub.activa !== undefined ? sub.activa : true
+    });
     setIsSubModalOpen(true);
   };
 
@@ -223,7 +256,7 @@ const Categorias = () => {
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500" onClick={() => handleCatEdit(cat)}>
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-rose-500 hover:bg-rose-50" onClick={() => deleteCategoria(cat.id)}>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-rose-500 hover:bg-rose-50" onClick={() => handleDeleteCategoria(cat)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -245,7 +278,7 @@ const Categorias = () => {
                           )}>
                             <td className="p-3 pl-8 align-middle font-semibold text-slate-700 flex items-center gap-2">
                               <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
-                              {sub.nombre}
+                              <span>{sub.nombre}</span>
                               {!sub.activa && <span className="text-[10px] font-bold text-rose-400 ml-2">(Inactiva)</span>}
                             </td>
                             <td className="p-3 pr-6 align-middle text-right w-24">
@@ -253,7 +286,7 @@ const Categorias = () => {
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-500" onClick={() => handleSubEdit(sub)}>
                                   <Edit className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-rose-500 hover:bg-rose-50" onClick={() => deleteSubcategoria(sub.id)}>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-rose-500 hover:bg-rose-50" onClick={() => handleDeleteSubcategoria(sub)}>
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                               </div>
