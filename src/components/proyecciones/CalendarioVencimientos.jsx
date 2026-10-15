@@ -135,7 +135,7 @@ export const CalendarioVencimientos = ({ mes, setMes }) => {
         id: p.id,
         esProyeccion: true,
         proyeccionId: p.id,
-        tipoElemento: esTarjeta ? 'tarjeta' : 'fijo',
+        tipoElemento: esTarjeta ? 'tarjeta' : (p.tipoGasto === 'variable' ? 'variable' : 'fijo'),
         dia: diaVto,
         concepto,
         responsable: p.responsable || null,
@@ -502,9 +502,13 @@ export const CalendarioVencimientos = ({ mes, setMes }) => {
                       "text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border tracking-wider",
                       item.tipoElemento === 'tarjeta' 
                         ? "bg-purple-50 text-purple-700 border-purple-200" 
-                        : "bg-blue-50 text-blue-700 border-blue-200"
+                        : (item.tipoElemento === 'variable'
+                            ? "bg-amber-50 text-amber-800 border-amber-200"
+                            : "bg-blue-50 text-blue-700 border-blue-200")
                     )}>
-                      {item.tipoElemento === 'tarjeta' ? 'Tarjeta' : 'Fijo / Servicio'}
+                      {item.tipoElemento === 'tarjeta' 
+                        ? 'Tarjeta' 
+                        : (item.tipoElemento === 'variable' ? 'Presupuesto Var.' : 'Fijo / Servicio')}
                     </span>
                   </td>
 

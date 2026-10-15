@@ -15,6 +15,7 @@ const Proyecciones = () => {
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
   const [searchTerm, setSearchTerm] = useState('');
   const [soloRecurrentes, setSoloRecurrentes] = useState(false);
+  const [filterNaturaleza, setFilterNaturaleza] = useState('todos'); // 'todos', 'fijo', 'variable'
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -25,6 +26,7 @@ const Proyecciones = () => {
     responsable: '',
     monto: '',
     diaVencimiento: '',
+    tipoGasto: 'fijo', // 'fijo' | 'variable'
     frecuencia: 'Única',
     fechaInicio: new Date().toISOString().substring(0, 10),
     fechaFin: '',
@@ -68,8 +70,9 @@ const Proyecciones = () => {
         subcategoriaId: proyeccion.subcategoriaId || '',
         descripcion: proyeccion.descripcion || '',
         responsable: proyeccion.responsable || '',
-        monto: proyeccion.montoProyectado.toString(),
+        monto: (proyeccion.montoProyectado !== undefined && proyeccion.montoProyectado !== null ? proyeccion.montoProyectado : (proyeccion.monto || '')).toString(),
         diaVencimiento: proyeccion.diaVencimiento !== undefined && proyeccion.diaVencimiento !== null ? String(proyeccion.diaVencimiento) : '',
+        tipoGasto: proyeccion.tipoGasto || 'fijo',
         frecuencia: proyeccion.frecuencia || 'Única',
         fechaInicio: proyeccion.fechaInicio || new Date().toISOString().substring(0, 10),
         fechaFin: proyeccion.fechaFin || '',
@@ -84,6 +87,7 @@ const Proyecciones = () => {
         responsable: '', 
         monto: '',
         diaVencimiento: '',
+        tipoGasto: 'fijo',
         frecuencia: 'Única',
         fechaInicio: new Date(mes + '-01T12:00:00').toISOString().substring(0, 10),
         fechaFin: '',
@@ -91,6 +95,13 @@ const Proyecciones = () => {
       });
     }
     setIsModalOpen(true);
+  };
+
+  const handleToggleTipoGastoProyeccion = async (p, e) => {
+    if (e) e.stopPropagation();
+    if (p.isVirtual) return;
+    const nuevoTipo = p.tipoGasto === 'variable' ? 'fijo' : 'variable';
+    await updateProyeccion(p.id, { tipoGasto: nuevoTipo });
   };
 
   const handleSubmit = async (e) => {
@@ -126,6 +137,7 @@ const Proyecciones = () => {
           montoProyectado: Number(formData.monto),
           diaVencimiento: diaNum,
           tipo: cat.tipo,
+          tipoGasto: formData.tipoGasto || 'fijo',
           descripcion: formData.descripcion,
           responsable: formData.responsable
         });
@@ -146,9 +158,11 @@ const Proyecciones = () => {
         await saveProyeccion({
           mes, 
           categoriaId: formData.categoriaId, 
-          monto: formData.monto, 
+          monto: formData.monto,
+          montoProyectado: Number(formData.monto),
           diaVencimiento: diaNum,
           tipo: cat.tipo, 
+          tipoGasto: formData.tipoGasto || 'fijo',
           descripcion: formData.descripcion, 
           subcategoriaId: formData.subcategoriaId, 
           responsable: formData.responsable,
@@ -162,7 +176,7 @@ const Proyecciones = () => {
       setIsModalOpen(false);
       setFormData({ 
         id: null, categoriaId: '', subcategoriaId: '', descripcion: '', responsable: '', monto: '', diaVencimiento: '',
-        frecuencia: 'Única', fechaInicio: new Date().toISOString().substring(0, 10), fechaFin: '', generarMovimientos: false
+        tipoGasto: 'fijo', frecuencia: 'Única', fechaInicio: new Date().toISOString().substring(0, 10), fechaFin: '', generarMovimientos: false
       });
       alert('Proyección guardada correctamente');
     } catch (error) {
@@ -228,6 +242,7 @@ const Proyecciones = () => {
           montoProyectado: d.montoProyectado,
           diaVencimiento: d.diaVencimiento || null,
           tipo: d.tipo,
+          tipoGasto: d.tipoGasto || 'fijo',
           descripcion: d.descripcion || '',
           subcategoriaId: subId,
           responsable: d.responsable || '',
@@ -250,6 +265,28 @@ const Proyecciones = () => {
     }
   };
 
+  const resumenTotales = useMemo(() => {
+    const ingresos = proyeccionesList
+      .filter(p => (p.tipo || categorias.find(c => c.id === p.categoriaId)?.tipo) === 'ingreso')
+      .reduce((acc, p) => acc + (Number(p.montoProyectado !== undefined && p.montoProyectado !== null ? p.montoProyectado : p.monto) || 0), 0);
+
+    const egresos = proyeccionesList
+      .filter(p => (p.tipo || categorias.find(c => c.id === p.categoriaId)?.tipo) === 'egreso');
+
+    const gastosFijos = egresos
+      .filter(p => p.tipoGasto !== 'variable')
+      .reduce((acc, p) => acc + (Number(p.montoProyectado !== undefined && p.montoProyectado !== null ? p.montoProyectado : p.monto) || 0), 0);
+
+    const gastosVariables = egresos
+      .filter(p => p.tipoGasto === 'variable')
+      .reduce((acc, p) => acc + (Number(p.montoProyectado !== undefined && p.montoProyectado !== null ? p.montoProyectado : p.monto) || 0), 0);
+
+    const totalGastos = gastosFijos + gastosVariables;
+    const saldo = ingresos - totalGastos;
+
+    return { ingresos, gastosFijos, gastosVariables, totalGastos, saldo };
+  }, [proyeccionesList, categorias]);
+
   const renderTable = (tipo) => {
     const list = proyeccionesList.filter(p => {
       // Búsqueda
@@ -266,6 +303,13 @@ const Proyecciones = () => {
         if ((p.frecuencia || 'Única') === 'Única' && !p.isVirtual) return false;
       }
 
+      // Filtro por naturaleza (Fijo vs Variable)
+      if (filterNaturaleza === 'fijo') {
+        if (p.tipoGasto === 'variable') return false;
+      } else if (filterNaturaleza === 'variable') {
+        if (p.tipoGasto !== 'variable') return false;
+      }
+
       if (p.tipo) return p.tipo === tipo;
       const cat = categorias.find(c => c.id === p.categoriaId);
       return cat?.tipo === tipo;
@@ -279,19 +323,21 @@ const Proyecciones = () => {
     return (
       <div className="relative w-full overflow-auto mt-4">
         <table className="w-full text-sm">
-          <thead className="border-b">
+          <thead className="border-b bg-slate-50/60">
             <tr>
-              <th className="h-10 px-2 text-left font-medium text-muted-foreground">Subcategoría</th>
-              <th className="h-10 px-2 text-left font-medium text-muted-foreground">Responsable</th>
-              <th className="h-10 px-2 text-left font-medium text-muted-foreground">Descripción</th>
-              <th className="h-10 px-2 text-right font-medium text-muted-foreground">Monto Proyectado</th>
-              <th className="h-10 px-2 text-right w-10"></th>
+              <th className="h-9 px-2 text-left font-semibold text-muted-foreground text-xs">Subcategoría</th>
+              <th className="h-9 px-2 text-center font-semibold text-muted-foreground text-xs w-24">Tipo</th>
+              <th className="h-9 px-2 text-center font-semibold text-muted-foreground text-xs w-24">Vencimiento</th>
+              <th className="h-9 px-2 text-left font-semibold text-muted-foreground text-xs">Responsable</th>
+              <th className="h-9 px-2 text-left font-semibold text-muted-foreground text-xs">Descripción</th>
+              <th className="h-9 px-2 text-right font-semibold text-muted-foreground text-xs">Monto Proyectado</th>
+              <th className="h-9 px-2 text-right w-10"></th>
             </tr>
           </thead>
           <tbody>
             {Object.keys(grouped).length === 0 ? (
               <tr>
-                <td colSpan="5" className="p-4 text-center text-muted-foreground italic">Sin proyecciones</td>
+                <td colSpan="7" className="p-4 text-center text-muted-foreground italic">Sin proyecciones</td>
               </tr>
             ) : (
               Object.keys(grouped).map(catId => {
@@ -299,21 +345,16 @@ const Proyecciones = () => {
                 const items = grouped[catId];
                 return (
                   <Fragment key={catId}>
-                    <tr className="bg-muted/30">
-                      <td colSpan="5" className="p-2 font-bold text-sm">
+                    <tr className="bg-muted/40">
+                      <td colSpan="7" className="p-2 font-bold text-sm text-slate-800">
                         {cat?.icono || '📁'} {cat?.nombre || 'Categoría desconocida'}
                       </td>
                     </tr>
                     {items.map(p => (
                       <tr key={p.id} className={cn("border-b hover:bg-muted/50 transition-colors", p.isVirtual ? "bg-slate-50/40" : "")}>
                         <td className="p-2 pl-6 font-medium text-indigo-600">
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span>{subcategorias.find(s => s.id === p.subcategoriaId)?.nombre || <span className="text-muted-foreground italic">Sin subcategoría</span>}</span>
-                            {p.diaVencimiento && (
-                              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-1.5 py-0.5 rounded w-max">
-                                📅 Vto: día {p.diaVencimiento}
-                              </span>
-                            )}
                             {p.isVirtual && (
                               <span className={cn(
                                 "inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider",
@@ -324,13 +365,53 @@ const Proyecciones = () => {
                             )}
                           </div>
                         </td>
-                        <td className="p-2 text-sm">
-                          {p.responsable || 'Sin asignar'}
+
+                        {/* Columna Tipo (Fijo / Variable) */}
+                        <td className="p-2 text-center whitespace-nowrap">
+                          {!p.isVirtual ? (
+                            <button
+                              type="button"
+                              onClick={(e) => handleToggleTipoGastoProyeccion(p, e)}
+                              title="Clic para alternar entre Fijo y Variable"
+                              className={cn(
+                                "px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all hover:scale-105 cursor-pointer shadow-2xs inline-flex items-center gap-1",
+                                p.tipoGasto === 'variable'
+                                  ? "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+                                  : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                              )}
+                            >
+                              {p.tipoGasto === 'variable' ? '🌊 Variable' : '📌 Fijo'}
+                            </button>
+                          ) : (
+                            <span className={cn(
+                              "px-2 py-0.5 rounded-full text-[10px] font-bold border inline-flex items-center gap-1",
+                              p.tipoGasto === 'variable'
+                                ? "bg-amber-50 text-amber-800 border-amber-200"
+                                : "bg-indigo-50 text-indigo-700 border-indigo-200"
+                            )}>
+                              {p.tipoGasto === 'variable' ? '🌊 Variable' : '📌 Fijo'}
+                            </span>
+                          )}
                         </td>
-                        <td className="p-2 text-sm text-muted-foreground truncate max-w-[150px]" title={p.descripcion}>
+
+                        {/* Columna Vencimiento */}
+                        <td className="p-2 text-center whitespace-nowrap">
+                          {p.diaVencimiento ? (
+                            <span className="text-[11px] font-bold text-slate-700 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                              📅 Día {p.diaVencimiento}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground/40 text-xs">-</span>
+                          )}
+                        </td>
+
+                        <td className="p-2 text-sm text-slate-700">
+                          {p.responsable || <span className="text-muted-foreground/50 text-xs">Sin asignar</span>}
+                        </td>
+                        <td className="p-2 text-sm text-muted-foreground truncate max-w-[140px]" title={p.descripcion}>
                           {p.descripcion || '-'}
                         </td>
-                        <td className="p-2 text-right font-bold text-slate-800">
+                        <td className="p-2 text-right font-bold text-slate-800 whitespace-nowrap">
                           ${(p.montoProyectado || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                         <td className="p-2 text-right flex justify-end gap-1">
@@ -447,6 +528,15 @@ const Proyecciones = () => {
               <span className="ml-1 px-1.5 py-0.2 text-[9px] bg-purple-900 text-purple-200 rounded-full">On</span>
             )}
           </Button>
+          <select 
+            className="p-1.5 border rounded-md bg-background text-xs font-semibold shadow-xs outline-none focus:ring-2 focus:ring-primary/20"
+            value={filterNaturaleza}
+            onChange={(e) => setFilterNaturaleza(e.target.value)}
+          >
+            <option value="todos">Todos los compromisos</option>
+            <option value="fijo">📌 Solo Fijos / Obligaciones</option>
+            <option value="variable">🌊 Solo Presupuesto Variable</option>
+          </select>
           <Button variant="outline" size="sm" onClick={duplicarMesAnterior} disabled={loading}>
             <Copy className="mr-2 h-4 w-4" /> Duplicar Anterior
           </Button>
@@ -455,6 +545,59 @@ const Proyecciones = () => {
           </Button>
         </div>
       </div>
+
+      {/* Resumen Financiero: Fijos vs Variables */}
+      <Card className="bg-slate-900 text-white shadow-md border-none overflow-hidden">
+        <CardContent className="p-6">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center divide-y md:divide-y-0 md:divide-x divide-slate-800">
+            <div className="pt-2 md:pt-0">
+              <p className="text-[11px] opacity-70 uppercase font-black tracking-wider text-emerald-400">Total Ingresos</p>
+              <p className="text-2xl font-black text-emerald-400 mt-1">
+                ${resumenTotales.ingresos.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              <span className="text-[10px] text-slate-400">Previstos para el mes</span>
+            </div>
+
+            <div className="pt-2 md:pt-0">
+              <p className="text-[11px] opacity-70 uppercase font-black tracking-wider text-indigo-400 flex items-center justify-center gap-1">
+                <span>📌 Gastos Fijos</span>
+              </p>
+              <p className="text-2xl font-black text-indigo-300 mt-1">
+                ${resumenTotales.gastosFijos.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              <span className="text-[10px] text-indigo-200/60 font-medium">Obligaciones ineludibles</span>
+            </div>
+
+            <div className="pt-2 md:pt-0">
+              <p className="text-[11px] opacity-70 uppercase font-black tracking-wider text-amber-400 flex items-center justify-center gap-1">
+                <span>🌊 Presupuesto Variable</span>
+              </p>
+              <p className="text-2xl font-black text-amber-300 mt-1">
+                ${resumenTotales.gastosVariables.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              <span className="text-[10px] text-amber-200/60 font-medium">Margen flexible / Consumo</span>
+            </div>
+
+            <div className="pt-2 md:pt-0">
+              <p className="text-[11px] opacity-70 uppercase font-black tracking-wider text-rose-400">Total Gastos</p>
+              <p className="text-2xl font-black text-rose-400 mt-1">
+                ${resumenTotales.totalGastos.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              <span className="text-[10px] text-slate-400">Fijos + Variables</span>
+            </div>
+
+            <div className="pt-2 md:pt-0 col-span-2 md:col-span-1">
+              <p className="text-[11px] opacity-70 uppercase font-black tracking-wider text-cyan-400">Saldo Estimado</p>
+              <p className={cn("text-2xl font-black mt-1", resumenTotales.saldo >= 0 ? "text-cyan-300" : "text-rose-400")}>
+                ${resumenTotales.saldo.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              <span className="text-[10px] text-slate-400">
+                {resumenTotales.saldo >= 0 ? 'Superávit planificado' : 'Déficit proyectado'}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
@@ -475,34 +618,6 @@ const Proyecciones = () => {
           </CardContent>
         </Card>
       </div>
-
-      <Card className="bg-slate-900 text-white">
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row justify-around gap-4 text-center">
-            <div>
-              <p className="text-xs opacity-60 uppercase font-bold">Total Ingresos</p>
-              <p className="text-2xl font-bold text-emerald-400">
-                ${proyeccionesList.filter(p => (p.tipo || categorias.find(c => c.id === p.categoriaId)?.tipo) === 'ingreso').reduce((acc, p) => acc + (Number(p.montoProyectado || p.monto) || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs opacity-60 uppercase font-bold">Total Gastos</p>
-              <p className="text-2xl font-bold text-rose-400">
-                ${proyeccionesList.filter(p => (p.tipo || categorias.find(c => c.id === p.categoriaId)?.tipo) === 'egreso').reduce((acc, p) => acc + (Number(p.montoProyectado || p.monto) || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs opacity-60 uppercase font-bold">Saldo Proyectado</p>
-              <p className="text-2xl font-bold text-indigo-400">
-                ${(
-                  proyeccionesList.filter(p => (p.tipo || categorias.find(c => c.id === p.categoriaId)?.tipo) === 'ingreso').reduce((acc, p) => acc + (Number(p.montoProyectado || p.monto) || 0), 0) - 
-                  proyeccionesList.filter(p => (p.tipo || categorias.find(c => c.id === p.categoriaId)?.tipo) === 'egreso').reduce((acc, p) => acc + (Number(p.montoProyectado || p.monto) || 0), 0)
-                ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
         </>
       )}
 
@@ -559,6 +674,48 @@ const Proyecciones = () => {
               <option value="Cecilia">Cecilia</option>
               <option value="Agustin">Agustin</option>
             </select>
+          </div>
+
+          {/* Naturaleza de la Proyección: Fijo vs Variable */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Naturaleza de la Proyección</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, tipoGasto: 'fijo' })}
+                className={cn(
+                  "p-3 rounded-lg border text-left transition-all flex flex-col gap-1 cursor-pointer",
+                  (formData.tipoGasto === 'fijo' || !formData.tipoGasto)
+                    ? "bg-indigo-50 border-indigo-500 text-indigo-950 ring-2 ring-indigo-500/20 shadow-xs"
+                    : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                )}
+              >
+                <span className="font-bold text-sm flex items-center gap-1.5">
+                  📌 Gasto / Ingreso Fijo
+                </span>
+                <span className="text-[11px] text-muted-foreground leading-tight">
+                  Obligación mensual ineludible, cuota, servicio o tratamiento recurrente.
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, tipoGasto: 'variable' })}
+                className={cn(
+                  "p-3 rounded-lg border text-left transition-all flex flex-col gap-1 cursor-pointer",
+                  formData.tipoGasto === 'variable'
+                    ? "bg-amber-50 border-amber-500 text-amber-950 ring-2 ring-amber-500/20 shadow-xs"
+                    : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                )}
+              >
+                <span className="font-bold text-sm flex items-center gap-1.5">
+                  🌊 Presupuesto Variable
+                </span>
+                <span className="text-[11px] text-muted-foreground leading-tight">
+                  Techo o margen estimativo para gastos flexibles del mes (supermercado, salidas, extras).
+                </span>
+              </button>
+            </div>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Descripción (opcional)</label>
