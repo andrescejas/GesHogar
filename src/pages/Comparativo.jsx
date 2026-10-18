@@ -3,8 +3,6 @@ import { useData } from '../context/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { cn } from '../lib/utils';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
-import { proyeccionAplicaEnMes } from '../lib/generadorRecurrentes';
-
 
 const Comparativo = () => {
   const { categorias, subcategorias, movimientos, proyecciones } = useData();
@@ -18,7 +16,7 @@ const Comparativo = () => {
     const subDetails = subs.map(sub => {
       const isSinSub = sub.id === 'sin-sub';
       
-      // Proyectado físico: proyecciones únicas del mes O recurrentes que aplican en el mes
+      // Proyectado físico: proyecciones del mes seleccionado
       const proyFisica = proyecciones
         .filter(p => {
           const matchCat = p.categoriaId === cat.id;
@@ -26,9 +24,7 @@ const Comparativo = () => {
             ? (!p.subcategoriaId || !subsCat.some(s => s.id === p.subcategoriaId)) 
             : p.subcategoriaId === sub.id;
           if (!matchCat || !matchSub) return false;
-          const freq = p.frecuencia || 'Única';
-          if (freq === 'Única') return p.mes === mes;
-          return proyeccionAplicaEnMes(p, mes);
+          return p.mes === mes;
         })
         .reduce((acc, p) => acc + Number(p.montoProyectado !== undefined && p.montoProyectado !== null ? p.montoProyectado : (p.monto || 0)), 0);
         

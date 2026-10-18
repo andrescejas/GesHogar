@@ -2,9 +2,6 @@ import { lazy, Suspense, useMemo, useState } from 'react';
 import { TrendingUp, TrendingDown, Wallet, ArrowRightLeft, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { useData } from '../context/DataContext';
-import { cn } from '../lib/utils';
-import { proyeccionAplicaEnMes } from '../lib/generadorRecurrentes';
-
 const DashboardCharts = lazy(() => import('../components/dashboard/DashboardCharts'));
 
 const Dashboard = () => {
@@ -14,14 +11,8 @@ const Dashboard = () => {
   const dataMes = useMemo(() => {
     const movs = movimientos.filter(m => m.fecha.startsWith(mes));
 
-    // Proyecciones que aplican al mes (únicas de este mes + recurrentes activas)
-    const proysDelMes = proyecciones.filter(p => {
-      const freq = p.frecuencia || 'Única';
-      if (freq === 'Única') {
-        return p.mes === mes;
-      }
-      return proyeccionAplicaEnMes(p, mes);
-    });
+    // Proyecciones del mes seleccionado
+    const proysDelMes = proyecciones.filter(p => p.mes === mes);
 
     const isTipo = (p, tipo) => {
       if (p.tipo) return p.tipo === tipo;

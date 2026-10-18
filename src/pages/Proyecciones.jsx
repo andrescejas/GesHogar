@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { Copy, Plus, Trash2, Edit, Search, ListFilter, Repeat, Calendar } from 'lucide-react';
+import { Copy, Plus, Trash2, Edit, Search, ListFilter, Calendar, ChevronLeft, ChevronRight, CalendarDays, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
@@ -9,13 +9,39 @@ import { useData } from '../context/DataContext';
 import { db } from '../lib/firebase';
 import { cn } from '../lib/utils';
 
+const getMesAnterior = (isoMes) => {
+  if (!isoMes) return '';
+  const [y, m] = isoMes.split('-').map(Number);
+  const d = new Date(y, m - 2, 1);
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${yy}-${mm}`;
+};
+
+const getMesSiguiente = (isoMes) => {
+  if (!isoMes) return '';
+  const [y, m] = isoMes.split('-').map(Number);
+  const d = new Date(y, m, 1);
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${yy}-${mm}`;
+};
+
+const formatNombreMes = (isoMes) => {
+  if (!isoMes) return '';
+  const [y, m] = isoMes.split('-').map(Number);
+  const date = new Date(y, m - 1, 1);
+  return date.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+};
+
 const Proyecciones = () => {
   const { categorias, subcategorias, proyecciones, movimientos, saveProyeccion, updateProyeccion, updateMovimiento, deleteProyeccion } = useData();
   const [modoVista, setModoVista] = useState('proyecciones'); // 'proyecciones' | 'vencimientos'
   const [mes, setMes] = useState(new Date().toISOString().substring(0, 7));
   const [searchTerm, setSearchTerm] = useState('');
-  const [soloRecurrentes, setSoloRecurrentes] = useState(false);
   const [filterNaturaleza, setFilterNaturaleza] = useState('todos'); // 'todos', 'fijo', 'variable'
+  const mesActualHoy = useMemo(() => new Date().toISOString().substring(0, 7), []);
+  const esMesActual = mes === mesActualHoy;
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -34,32 +60,7 @@ const Proyecciones = () => {
   });
 
   const proyeccionesList = useMemo(() => {
-    const proManuales = proyecciones.filter(p => {
-      const freq = p.frecuencia || 'Única';
-      if (freq === 'Única') {
-        return p.mes === mes;
-      }
-
-      const startMonth = p.fechaInicio ? p.fechaInicio.substring(0, 7) : p.mes;
-      const endMonth = p.fechaFin ? p.fechaFin.substring(0, 7) : null;
-      
-      if (mes < startMonth) return false;
-      if (endMonth && mes > endMonth) return false;
-
-      const dStart = new Date(startMonth + '-01');
-      const dCurrent = new Date(mes + '-01');
-      const diffMonths = (dCurrent.getFullYear() - dStart.getFullYear()) * 12 + (dCurrent.getMonth() - dStart.getMonth());
-
-      switch(freq) {
-        case 'Mensual': return true;
-        case 'Bimestral': return diffMonths % 2 === 0;
-        case 'Trimestral': return diffMonths % 3 === 0;
-        case 'Semestral': return diffMonths % 6 === 0;
-        case 'Anual': return diffMonths % 12 === 0;
-        default: return false;
-      }
-    });
-    return proManuales;
+    return proyecciones.filter(p => p.mes === mes);
   }, [proyecciones, mes]);
 
   const handleOpenModal = (proyeccion = null) => {
@@ -203,19 +204,14 @@ const Proyecciones = () => {
     setLoading(true);
     try {
       const snap = await getDocs(query(collection(db, 'proyecciones'), where('mes', '==', mesAnterior)));
-      const unicas = snap.empty ? [] : snap.docs
-        .map(docSnap => docSnap.data())
-        .filter(d => (d.frecuencia || 'Única') === 'Única');
+      const anteriores = snap.empty ? [] : snap.docs.map(docSnap => docSnap.data());
 
-      if (unicas.length === 0) {
-        alert('No hay proyecciones únicas en el mes anterior.\nLas recurrentes (Mensual, Anual, etc.) ya aparecen automáticamente.');
+      if (anteriores.length === 0) {
+        alert(`No hay proyecciones cargadas en el mes anterior (${mesAnterior}).`);
         return;
       }
 
-      const existentesMesActual = proyecciones.filter(p =>
-        p.mes === mes &&
-        (p.frecuencia || 'Única') === 'Única'
-      );
+      const existentesMesActual = proyecciones.filter(p => p.mes === mes);
 
       const esMismaProyeccion = (base, existente) => {
         const subBase = base.subcategoriaId || base.subcategoria || '';
@@ -230,7 +226,7 @@ const Proyecciones = () => {
         );
       };
 
-      const aDuplicar = unicas.filter(d =>
+      const aDuplicar = anteriores.filter(d =>
         !existentesMesActual.some(existente => esMismaProyeccion(d, existente))
       );
 
@@ -239,7 +235,7 @@ const Proyecciones = () => {
         return saveProyeccion({
           mes,
           categoriaId: d.categoriaId,
-          montoProyectado: d.montoProyectado,
+          montoProyectado: Number(d.montoProyectado !== undefined && d.montoProyectado !== null ? d.montoProyectado : (d.monto || 0)),
           diaVencimiento: d.diaVencimiento || null,
           tipo: d.tipo,
           tipoGasto: d.tipoGasto || 'fijo',
@@ -255,8 +251,8 @@ const Proyecciones = () => {
 
       await Promise.all(promises);
 
-      const omitidas = unicas.length - aDuplicar.length;
-      alert(`Se duplicaron ${aDuplicar.length} proyección(es) única(s).${omitidas > 0 ? `\nSe omitieron ${omitidas} porque ya existían en ${mes}.` : ''}\nLas recurrentes ya están incluidas automáticamente.`);
+      const omitidas = anteriores.length - aDuplicar.length;
+      alert(`Se duplicaron ${aDuplicar.length} proyecciones desde ${mesAnterior}.${omitidas > 0 ? `\nSe omitieron ${omitidas} porque ya existían en ${mes}.` : ''}`);
     } catch (error) {
       console.error('Error duplicando mes anterior:', error);
       alert('No se pudo duplicar el mes anterior: ' + error.message);
@@ -298,10 +294,6 @@ const Proyecciones = () => {
 
       if (!matchesSearch) return false;
 
-      // Filtro solo recurrentes
-      if (soloRecurrentes) {
-        if ((p.frecuencia || 'Única') === 'Única' && !p.isVirtual) return false;
-      }
 
       // Filtro por naturaleza (Fijo vs Variable)
       if (filterNaturaleza === 'fijo') {
@@ -488,63 +480,161 @@ const Proyecciones = () => {
         />
       ) : (
         <>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <p className="text-muted-foreground text-sm">Planifica tus ingresos y gastos para cada mes.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Buscar..."
-              className="pl-9 pr-4 py-2 text-sm border rounded-md bg-background w-[150px] md:w-[200px]"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+      {/* BARRA HERO: NAVEGADOR DE MES Y ACCIONES PRINCIPALES */}
+      <div className="bg-card border rounded-2xl p-4 shadow-sm space-y-4 bg-gradient-to-r from-slate-50 via-white to-indigo-50/30">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          
+          {/* CONTROL DESTACADO DE MES */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="inline-flex items-center bg-white border-2 border-indigo-200/90 rounded-2xl p-1.5 shadow-sm hover:border-indigo-400 transition-all">
+              <button
+                type="button"
+                onClick={() => setMes(getMesAnterior(mes))}
+                className="p-2 rounded-xl hover:bg-slate-100 active:scale-95 text-slate-700 transition-all cursor-pointer"
+                title="Mes anterior"
+              >
+                <ChevronLeft className="h-5 w-5 text-indigo-700" />
+              </button>
+
+              <div className="flex items-center gap-3 px-3 py-1">
+                <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-xs">
+                  <CalendarDays className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-black text-slate-900 capitalize tracking-tight">
+                      {formatNombreMes(mes)}
+                    </span>
+                    {esMesActual ? (
+                      <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 rounded-full border border-emerald-300">
+                        Mes en curso
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-[10px] font-bold uppercase bg-slate-100 text-slate-600 rounded-full border border-slate-200">
+                        Histórico / Proyectado
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground font-semibold">
+                    {proyeccionesList.length > 0 
+                      ? `${proyeccionesList.length} presupuestos cargados` 
+                      : 'Sin proyecciones cargadas'}
+                  </p>
+                </div>
+
+                {/* Input de mes estilizado con botón de calendario */}
+                <div className="relative ml-2">
+                  <input 
+                    type="month" 
+                    className="p-2 pl-3 pr-2 border border-slate-200 rounded-xl bg-slate-50 hover:bg-white text-xs font-bold text-slate-800 shadow-2xs outline-none focus:ring-2 focus:ring-indigo-500/30 cursor-pointer transition-all"
+                    value={mes}
+                    onChange={(e) => setMes(e.target.value)}
+                    title="Seleccionar cualquier mes"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMes(getMesSiguiente(mes))}
+                className="p-2 rounded-xl hover:bg-slate-100 active:scale-95 text-slate-700 transition-all cursor-pointer"
+                title="Mes siguiente"
+              >
+                <ChevronRight className="h-5 w-5 text-indigo-700" />
+              </button>
+            </div>
+
+            {!esMesActual && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMes(mesActualHoy)}
+                className="rounded-xl border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-bold gap-1.5 shadow-2xs cursor-pointer"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Volver al Mes Actual</span>
+              </Button>
+            )}
           </div>
-          <input 
-            type="month" 
-            className="p-2 border rounded-md bg-background text-sm font-medium"
-            value={mes}
-            onChange={(e) => setMes(e.target.value)}
-          />
-          <Button
-            type="button"
-            variant={soloRecurrentes ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSoloRecurrentes(!soloRecurrentes)}
-            className={cn(
-              "text-xs font-semibold gap-1.5 transition-all",
-              soloRecurrentes 
-                ? "bg-purple-700 text-white hover:bg-purple-800 border-purple-700 shadow-sm" 
-                : "border-slate-200 text-slate-700 hover:bg-purple-50 hover:text-purple-700"
-            )}
-            title="Mostrar únicamente proyecciones recurrentes"
-          >
-            <Repeat className="h-3.5 w-3.5" />
-            <span>Solo Recurrentes</span>
-            {soloRecurrentes && (
-              <span className="ml-1 px-1.5 py-0.2 text-[9px] bg-purple-900 text-purple-200 rounded-full">On</span>
-            )}
-          </Button>
-          <select 
-            className="p-1.5 border rounded-md bg-background text-xs font-semibold shadow-xs outline-none focus:ring-2 focus:ring-primary/20"
-            value={filterNaturaleza}
-            onChange={(e) => setFilterNaturaleza(e.target.value)}
-          >
-            <option value="todos">Todos los compromisos</option>
-            <option value="fijo">📌 Solo Fijos / Obligaciones</option>
-            <option value="variable">🌊 Solo Presupuesto Variable</option>
-          </select>
-          <Button variant="outline" size="sm" onClick={duplicarMesAnterior} disabled={loading}>
-            <Copy className="mr-2 h-4 w-4" /> Duplicar Anterior
-          </Button>
-          <Button size="sm" onClick={() => handleOpenModal()}>
-            <Plus className="mr-2 h-4 w-4" /> Nueva Proyección
-          </Button>
+
+          {/* BOTONES PRINCIPALES DE ACCIÓN */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={duplicarMesAnterior} 
+              disabled={loading}
+              className="gap-2 font-bold rounded-xl border-indigo-300 text-indigo-800 hover:bg-indigo-100/60 shadow-2xs cursor-pointer py-2 px-3.5"
+              title={`Clonar proyecciones desde ${formatNombreMes(getMesAnterior(mes))}`}
+            >
+              <Copy className="h-4 w-4 text-indigo-600" />
+              <span>Duplicar Anterior</span>
+            </Button>
+            <Button 
+              size="sm" 
+              onClick={() => handleOpenModal()}
+              className="gap-2 font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs cursor-pointer py-2 px-3.5"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Nueva Proyección</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* FILA SECUNDARIA: BÚSQUEDA Y FILTRO */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200/60">
+          <div className="flex flex-wrap items-center gap-2.5 flex-1">
+            <div className="relative flex-1 sm:max-w-xs">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Buscar por concepto o categoría..."
+                className="pl-9 pr-4 py-2 text-xs border rounded-xl bg-white w-full outline-none focus:ring-2 focus:ring-indigo-500/20"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <select 
+              className="p-2 border rounded-xl bg-white text-xs font-semibold shadow-2xs outline-none focus:ring-2 focus:ring-indigo-500/20"
+              value={filterNaturaleza}
+              onChange={(e) => setFilterNaturaleza(e.target.value)}
+            >
+              <option value="todos">Todos los compromisos</option>
+              <option value="fijo">📌 Solo Fijos / Obligaciones</option>
+              <option value="variable">🌊 Solo Presupuesto Variable</option>
+            </select>
+          </div>
         </div>
       </div>
+
+      {/* BANNER INFORMATIVO SI EL MES NO TIENE PROYECCIONES */}
+      {proyeccionesList.length === 0 && (
+        <div className="p-5 rounded-2xl border-2 border-dashed border-indigo-300 bg-indigo-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in duration-200 shadow-xs">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-indigo-600 text-white rounded-xl shadow-xs shrink-0">
+              <Copy className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-base font-black text-indigo-950 capitalize">
+                {formatNombreMes(mes)} todavía no tiene proyecciones
+              </p>
+              <p className="text-xs text-indigo-900/80 mt-0.5 font-medium">
+                Podés inicializar todo este mes clonando la estructura de {formatNombreMes(getMesAnterior(mes))} en un solo clic.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={duplicarMesAnterior}
+            disabled={loading}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-2 rounded-xl shadow-sm shrink-0 px-4 py-2 cursor-pointer"
+          >
+            <Copy className="h-4 w-4" />
+            <span>Duplicar desde {formatNombreMes(getMesAnterior(mes))}</span>
+          </Button>
+        </div>
+      )}
 
       {/* Resumen Financiero: Fijos vs Variables */}
       <Card className="bg-slate-900 text-white shadow-md border-none overflow-hidden">

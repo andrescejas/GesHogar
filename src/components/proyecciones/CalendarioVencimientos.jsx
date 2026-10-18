@@ -46,33 +46,9 @@ export const CalendarioVencimientos = ({ mes, setMes }) => {
   const mesAnterior = useMemo(() => getMesAnterior(mes), [mes]);
   const nombreMesActual = useMemo(() => formatNombreMes(mes), [mes]);
 
-  // 0. PROYECCIONES QUE APLICAN AL MES SELECCIONADO (según su mes o frecuencia recurrente)
+  // 0. PROYECCIONES QUE APLICAN AL MES SELECCIONADO
   const proyeccionesDelMes = useMemo(() => {
-    return proyecciones.filter(p => {
-      const freq = p.frecuencia || 'Única';
-      if (freq === 'Única') {
-        return p.mes === mes;
-      }
-
-      const startMonth = p.fechaInicio ? p.fechaInicio.substring(0, 7) : p.mes;
-      const endMonth = p.fechaFin ? p.fechaFin.substring(0, 7) : null;
-      
-      if (mes < startMonth) return false;
-      if (endMonth && mes > endMonth) return false;
-
-      const dStart = new Date(startMonth + '-01');
-      const dCurrent = new Date(mes + '-01');
-      const diffMonths = (dCurrent.getFullYear() - dStart.getFullYear()) * 12 + (dCurrent.getMonth() - dStart.getMonth());
-
-      switch(freq) {
-        case 'Mensual': return true;
-        case 'Bimestral': return diffMonths % 2 === 0;
-        case 'Trimestral': return diffMonths % 3 === 0;
-        case 'Semestral': return diffMonths % 6 === 0;
-        case 'Anual': return diffMonths % 12 === 0;
-        default: return false;
-      }
-    });
+    return proyecciones.filter(p => p.mes === mes);
   }, [proyecciones, mes]);
 
   // 1. COMPROMISOS DE SERVICIOS Y GASTOS FIJOS (basado en las proyecciones activas de egreso de este mes)
