@@ -2,6 +2,7 @@ import { lazy, Suspense, useMemo, useState } from 'react';
 import { TrendingUp, TrendingDown, Wallet, ArrowRightLeft, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { useData } from '../context/DataContext';
+import { cn } from '../lib/utils';
 const DashboardCharts = lazy(() => import('../components/dashboard/DashboardCharts'));
 
 const Dashboard = () => {

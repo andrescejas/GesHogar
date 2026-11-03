@@ -66,6 +66,7 @@ export function parsearBancorFile(arrayBuffer, config = {}) {
     const esRendimiento = descUpper.includes('INTERES POR CAPITALIZACION') || descUpper.includes('CAPITALIZACION');
     const esDebinBilletera = descUpper.includes('DEBIN') && (descUpper.includes('MERCADOLIBRE') || descUpper.includes('NARANJA'));
     const esDebitoAuto = descUpper.includes('DEB.AUT') || descUpper.includes('DEBITO AUTOMATICO') || descUpper.includes('DEBITO DIRECTO');
+    const esHaberesSueldo = !esEgreso && (descUpper.includes('HABERES') || descUpper.includes('GOBERNACION') || descUpper.includes('SUELDO'));
 
     let contabiliza = true;
     let etiquetaEspecial = '';
@@ -74,6 +75,9 @@ export function parsearBancorFile(arrayBuffer, config = {}) {
     if (esPagoTarjeta) {
       contabiliza = false;
       etiquetaEspecial = 'Pago Tarjeta Cordobesa';
+    } else if (esHaberesSueldo) {
+      contabiliza = true;
+      etiquetaEspecial = 'Sueldo Provincia';
     } else if (esRendimiento) {
       etiquetaEspecial = 'Rendimiento Bancor';
     } else if (esDebitoAuto) {

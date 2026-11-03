@@ -75,7 +75,7 @@ Tanto **Andrés** como **Cecilia** pueden descargar su resumen mensual oficial e
   2. Ir a la sección **Cuentas**.
   3. Hacer clic sobre la **cuenta** (Caja de Ahorro en pesos).
   4. Ingresar a **Movimientos Históricos**.
-  5. Aplicar el **filtro** de fechas para el mes a conciliar.
+  5. Aplicar el **filtro** de fechas para el mes a conciliar (ej. del `01/10/2026` al `31/10/2026`).
   6. Hacer clic en **Descargar consulta en Excel** (genera archivo `.xls` / `.xlsx` tipo `CA $ 923 0001258103-Movimientos.xls`).
 * **Tarjeta Cordobesa Mastercard (Cecilia):**
   1. Menú *Tarjetas* $\rightarrow$ *Cordobesa*.
@@ -117,6 +117,7 @@ El importador inteligente de GesHogar unifica todos estos formatos sin necesidad
 En la grilla previa vas a ver cada movimiento clasificado:
 * 🟢 **Computables listos:** Ya tienen asignada Categoría y Subcategoría gracias a las reglas automáticas.
 * ⚪ **Excluidos (No computan):** Pagos de resumen de tarjeta, transferencias entre cuentas propias o ingresos de dinero propios. *Vienen desmarcados por defecto para evitar doble cómputo de gastos.*
+* 🔍 **Triaje Rápido:** Podés usar el filtro **`🟢 Solo Ingresos`** o **`🔴 Solo Gastos`** para auditar y tildar/destildar con total control antes de guardar.
 * ⚠️ **Sin Categoría:** Comercios nuevos no reconocidos.
   * Elegí la **Categoría** y **Subcategoría** directamente en esa fila.
   * Dejá tildada la casilla **"Guardar regla"** *(GesHogar la memoriza en la base de datos para que en los próximos meses se clasifique sola)*.
@@ -136,6 +137,9 @@ En la grilla previa vas a ver cada movimiento clasificado:
    * **Nunca marques como computable el pago del resumen**, de lo contrario estarías pagando y contando la misma compra dos veces.
 3. **Transferencias entre cuentas del hogar:**
    * Las transferencias entre Andrés y Cecilia están excluidas por reglas internas para no inflar artificialmente los ingresos ni los gastos del hogar.
+4. **Sueldo Provincia / Ingresos a mes vencido:**
+   * Por defecto, el sueldo de Bancor viene **tildado de entrada** como Ingreso Real para computar en el mes del extracto.
+   * **Opción a mes vencido:** Si preferís que ese ingreso compute para cancelar los gastos del mes anterior con el monto nuevo, podés filtrar por **`🟢 Solo Ingresos`**, **destildar** esa fila para que no se importe, y registrarlo a mano en `Movimientos` con fecha del último día del mes a cerrar (ej: `31/10/2026`).
 
 ---
 
@@ -153,16 +157,18 @@ En la grilla previa vas a ver cada movimiento clasificado:
 │  Días 1 al 5 del mes siguiente:                             │
 │  ► Cierra el mes calendario de las cuentas bancarias.       │
 │  ► Descargar e importar:                                    │
-│     - Mercado Pago (.csv)                                   │
+│     - Mercado Pago (.pdf / .csv)                            │
 │     - Santander Caja de Ahorro (.xlsx)                      │
-│     - Bancor Caja de Ahorro (.xls)                          │
+│     - Bancor Caja de Ahorro (.xls / .xlsx)                  │
+│       (Usar filtro "Solo Ingresos" para auditar entradas)   │
 └──────────────────────────────┬──────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  Día 6 (Cierre y Control - 10 minutos):                     │
-│  1. En Movimientos: verificar que "Sin categoría" esté en 0.│
-│  2. En Comparativo: revisar desvíos Real vs. Proyectado.    │
-│  3. En Proyecciones: confirmar la meta del nuevo mes.       │
+│  1. Si destildaste el sueldo, cargarlo a mano con fecha 31. │
+│  2. En Movimientos: verificar que "Sin categoría" esté en 0.│
+│  3. En Comparativo: revisar desvíos Real vs. Proyectado.    │
+│  4. En Proyecciones: confirmar la meta del nuevo mes.       │
 └─────────────────────────────────────────────────────────────┘
 ```

@@ -152,11 +152,22 @@ const ImportadorModal = ({ isOpen, onClose }) => {
   const metrics = useMemo(() => {
     const total = items.length;
     const computables = items.filter(i => i.contabiliza !== false);
-    const totalGastos = computables.filter(i => i.tipo === 'egreso').reduce((acc, i) => acc + (i.monto || 0), 0);
-    const totalIngresos = computables.filter(i => i.tipo === 'ingreso').reduce((acc, i) => acc + (i.monto || 0), 0);
     const noComputan = items.filter(i => i.contabiliza === false);
     const sinCategoria = computables.filter(i => !i.categoriaId);
     const listos = items.filter(i => i.seleccionado);
+
+    const totalIngresosCount = items.filter(i => i.tipo === 'ingreso').length;
+    const totalEgresosCount = items.filter(i => i.tipo === 'egreso').length;
+
+    // Solo computan y suman los que están efectivamente seleccionados para importar
+    const totalGastos = items
+      .filter(i => i.seleccionado && i.tipo === 'egreso')
+      .reduce((acc, i) => acc + (i.monto || 0), 0);
+    const totalIngresos = items
+      .filter(i => i.seleccionado && i.tipo === 'ingreso')
+      .reduce((acc, i) => acc + (i.monto || 0), 0);
+
+    const ingresosSeleccionadosCount = items.filter(i => i.seleccionado && i.tipo === 'ingreso').length;
 
     return {
       total,
@@ -164,7 +175,10 @@ const ImportadorModal = ({ isOpen, onClose }) => {
       totalIngresos,
       noComputanCount: noComputan.length,
       sinCategoriaCount: sinCategoria.length,
-      seleccionadosCount: listos.length
+      seleccionadosCount: listos.length,
+      totalIngresosCount,
+      totalEgresosCount,
+      ingresosSeleccionadosCount
     };
   }, [items]);
 
@@ -181,6 +195,12 @@ const ImportadorModal = ({ isOpen, onClose }) => {
       }
 
       // Filtro de estado
+      if (filtroEstado === 'ingresos') {
+        return it.tipo === 'ingreso';
+      }
+      if (filtroEstado === 'egresos') {
+        return it.tipo === 'egreso';
+      }
       if (filtroEstado === 'sin_categoria') {
         return it.contabiliza !== false && !it.categoriaId;
       }
@@ -319,7 +339,12 @@ const ImportadorModal = ({ isOpen, onClose }) => {
               </p>
             </div>
             <div className="p-3 rounded-lg border bg-emerald-50/60 border-emerald-200">
-              <p className="text-xs font-bold text-emerald-700 uppercase">Ingresos Computables</p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-emerald-700 uppercase">Ingresos a Importar</p>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-200/80 text-emerald-900">
+                  {metrics.ingresosSeleccionadosCount} de {metrics.totalIngresosCount}
+                </span>
+              </div>
               <p className="text-xl font-black text-emerald-600 mt-0.5">
                 ${metrics.totalIngresos.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
@@ -349,11 +374,13 @@ const ImportadorModal = ({ isOpen, onClose }) => {
                 onChange={(e) => setFiltroTexto(e.target.value)}
               />
               <select
-                className="p-1.5 text-xs border rounded-md bg-background"
+                className="p-1.5 text-xs border rounded-md bg-background font-medium"
                 value={filtroEstado}
                 onChange={(e) => setFiltroEstado(e.target.value)}
               >
                 <option value="todos">Todos los movimientos ({items.length})</option>
+                <option value="ingresos">🟢 Solo Ingresos ({metrics.totalIngresosCount})</option>
+                <option value="egresos">🔴 Solo Gastos ({metrics.totalEgresosCount})</option>
                 <option value="sin_categoria">Requieren atención / Sin categoría ({metrics.sinCategoriaCount})</option>
                 <option value="computables">Solo computables ({metrics.total - metrics.noComputanCount})</option>
                 <option value="no_computan">Transferencias internas / No computan ({metrics.noComputanCount})</option>
