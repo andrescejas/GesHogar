@@ -29,15 +29,29 @@ export async function parsearArchivoResumen(file, config = {}) {
   if (nombreArchivo.endsWith('.csv') || nombreArchivo.endsWith('.txt')) {
     const texto = await file.text();
     if (texto.includes('RELEASE_DATE') || texto.includes('TRANSACTION_NET_AMOUNT')) {
-      origenDetectado = 'Mercado Pago';
-      transaccionesCrudas = parsearMercadoPagoCsv(texto, config);
+      let respCsv = config.responsableDefault || 'Andres';
+      if (nombreArchivo.includes('ceci') || nombreArchivo.includes('cecilia')) {
+        respCsv = 'Cecilia';
+      } else if (nombreArchivo.includes('andres')) {
+        respCsv = 'Andres';
+      }
+      responsableDetectado = respCsv;
+      origenDetectado = `Mercado Pago (${responsableDetectado})`;
+      transaccionesCrudas = parsearMercadoPagoCsv(texto, { ...config, responsableDefault: respCsv });
     } else if (texto.includes('Santander') || texto.includes('Caja de Ahorro')) {
       origenDetectado = 'Banco Santander';
       transaccionesCrudas = parsearSantanderFile(texto, config);
     } else {
       // Intentar Mercado Pago por defecto para CSV
-      origenDetectado = 'Mercado Pago';
-      transaccionesCrudas = parsearMercadoPagoCsv(texto, config);
+      let respCsv = config.responsableDefault || 'Andres';
+      if (nombreArchivo.includes('ceci') || nombreArchivo.includes('cecilia')) {
+        respCsv = 'Cecilia';
+      } else if (nombreArchivo.includes('andres')) {
+        respCsv = 'Andres';
+      }
+      responsableDetectado = respCsv;
+      origenDetectado = `Mercado Pago (${responsableDetectado})`;
+      transaccionesCrudas = parsearMercadoPagoCsv(texto, { ...config, responsableDefault: respCsv });
     }
   } else if (nombreArchivo.endsWith('.xlsx') || nombreArchivo.endsWith('.xls')) {
     const arrayBuffer = await file.arrayBuffer();

@@ -47,13 +47,24 @@ export async function parsearNaranjaXFile(arrayBuffer, config = {}) {
       }))
       .filter(it => it.str.length > 0);
 
-    // 1. Detectar titular en encabezado de página 1
+    // 1. Detectar titular en encabezado de página 1 (restringido a metadatos superiores)
     if (p === 1) {
-      const fullText = textItems.map(it => it.str).join(' ').toLowerCase();
-      if (fullText.includes('cecilia') || fullText.includes('maurizi')) {
-        titularDetectado = 'Cecilia';
-      } else if (fullText.includes('andres') || fullText.includes('cejas')) {
+      const cutoffIndex = textItems.findIndex(it => {
+        const s = it.str.toLowerCase();
+        return s.includes('detalle de movimientos') || s.includes('movimientos') || s.includes('consumos') || s === 'fecha';
+      });
+
+      const headerItems = cutoffIndex !== -1 ? textItems.slice(0, cutoffIndex + 1) : textItems.slice(0, 35);
+      const headerText = headerItems.map(it => it.str).join(' ').toLowerCase();
+
+      if (headerText.includes('20260855833') || headerText.includes('20-26085583-3')) {
         titularDetectado = 'Andres';
+      } else if (headerText.includes('27299691948') || headerText.includes('27-29969194-8')) {
+        titularDetectado = 'Cecilia';
+      } else if (headerText.includes('cejas') || headerText.includes('andres')) {
+        titularDetectado = 'Andres';
+      } else if (headerText.includes('maurizi') || headerText.includes('cecilia')) {
+        titularDetectado = 'Cecilia';
       }
     }
 

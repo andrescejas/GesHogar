@@ -42,8 +42,10 @@ const ImportadorModal = ({ isOpen, onClose }) => {
       setFile(selected);
       setErrorMsg('');
       const nameLower = selected.name.toLowerCase();
-      if (nameLower.includes('bancor') || nameLower.startsWith('ca $') || nameLower.includes('cordobesa')) {
+      if (nameLower.includes('bancor') || nameLower.startsWith('ca $') || nameLower.includes('cordobesa') || nameLower.includes('ceci')) {
         setResponsableDefault('Cecilia');
+      } else if (nameLower.includes('andres') || nameLower.includes('santander') || nameLower.includes('amex')) {
+        setResponsableDefault('Andres');
       }
     }
   };
@@ -98,6 +100,31 @@ const ImportadorModal = ({ isOpen, onClose }) => {
 
       return updated;
     }));
+  };
+
+  // Cambiar responsable masivamente en todo el lote
+  const handleCambiarResponsableTodos = (nuevoResp) => {
+    setResponsableDefault(nuevoResp);
+    setItems(prev => prev.map(it => {
+      const esCeci = nuevoResp === 'Cecilia';
+      let tarjeta = it.tarjeta;
+      if (it.tarjeta?.includes('mercadopago')) {
+        tarjeta = esCeci ? 'mercadopago_cecilia' : 'mercadopago_andres';
+      }
+      return {
+        ...it,
+        responsable: nuevoResp,
+        tarjeta,
+        origen: it.origen?.includes('Mercado Pago') ? `Mercado Pago (${nuevoResp})` : it.origen
+      };
+    }));
+    setParsedData(prev => prev ? ({
+      ...prev,
+      origenDetectado: prev.origenDetectado?.includes('Mercado Pago')
+        ? `Mercado Pago (${nuevoResp})`
+        : prev.origenDetectado,
+      responsableDetectado: nuevoResp
+    }) : prev);
   };
 
   // Seleccionar / Deseleccionar todos
@@ -387,7 +414,24 @@ const ImportadorModal = ({ isOpen, onClose }) => {
               </select>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded border text-xs" title="Asignar todo este extracto a un responsable">
+                <span className="text-[11px] font-semibold text-slate-500 px-1">Lote:</span>
+                {responsablesDisponibles.map(r => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => handleCambiarResponsableTodos(r)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
+                      responsableDefault === r 
+                        ? "bg-slate-900 text-white shadow-xs" 
+                        : "text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
               <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => handleToggleTodos(true)}>
                 Seleccionar todos
               </Button>
