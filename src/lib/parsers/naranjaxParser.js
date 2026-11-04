@@ -161,15 +161,16 @@ export async function parsearNaranjaXFile(arrayBuffer, config = {}) {
         descUpper.includes('SILVANA ELENA MAURIZI') ||
         descUpper.includes('SILVANA MAURIZI');
       const esRendimiento = descUpper.includes('RENDIMIENTO DIARIO') || descUpper.includes('RENDIMIENTO');
+      const esFrascoOReserva = (descUpper.includes('FRASCO') || descUpper.includes('RESERVA') || descUpper.includes('APARTADO')) && !esRendimiento;
       const esFondeo = descUpper.includes('INGRESO DE DINERO');
 
       let contabiliza = true;
       let etiquetaEspecial = '';
       let alertaImportacion = '';
 
-      if (esTransferenciaPropia) {
+      if (esTransferenciaPropia || esFrascoOReserva) {
         contabiliza = false;
-        etiquetaEspecial = 'Movimiento Interno';
+        etiquetaEspecial = esFrascoOReserva ? 'Movimiento Interno (Reserva/Frasco)' : 'Movimiento Interno';
       } else if (esFondoSilvana) {
         contabiliza = false;
         etiquetaEspecial = 'Fondos Terceros (Silvana)';
@@ -197,6 +198,7 @@ export async function parsearNaranjaXFile(arrayBuffer, config = {}) {
         contabiliza,
         etiquetaEspecial,
         alertaImportacion,
+        esRendimiento,
         refId: nroOp || undefined,
         responsable: titularDetectado,
         estado: 'pagado',

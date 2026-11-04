@@ -102,6 +102,7 @@ export function parsearBancorFile(arrayBuffer, config = {}) {
       contabiliza,
       etiquetaEspecial,
       alertaImportacion,
+      esRendimiento,
       origen: 'Banco de Córdoba (Bancor)'
     });
   }

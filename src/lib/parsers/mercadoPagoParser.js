@@ -62,14 +62,15 @@ export function parsearMercadoPagoCsv(contenidoTexto, config = {}) {
       descLower.includes('maurizi cecilia soleda');
 
     const esFondeo = descLower.includes('ingreso de dinero');
+    const esReservaInterna = (descLower.includes('frasco') || descLower.includes('reserva') || descLower.includes('apartado')) && !esRendimiento;
 
     let contabiliza = true;
     let etiquetaEspecial = '';
     let alertaImportacion = '';
 
-    if (esCuentaPropia) {
+    if (esCuentaPropia || esReservaInterna) {
       contabiliza = false;
-      etiquetaEspecial = 'Movimiento Interno';
+      etiquetaEspecial = esReservaInterna ? 'Movimiento Interno (Reserva/Frasco)' : 'Movimiento Interno';
     } else if (esRendimiento) {
       etiquetaEspecial = 'Rendimiento Billetera';
     } else if (esFondeo) {
@@ -96,6 +97,7 @@ export function parsearMercadoPagoCsv(contenidoTexto, config = {}) {
       contabiliza,
       etiquetaEspecial,
       alertaImportacion,
+      esRendimiento,
       origen: 'Mercado Pago'
     });
   }
@@ -197,13 +199,14 @@ export async function parsearMercadoPagoPdf(arrayBuffer, config = {}) {
         descLower.includes('cecilia soledad maurizi');
 
       const esFondeo = descLower.includes('ingreso de dinero');
+      const esReservaInterna = (descLower.includes('frasco') || descLower.includes('reserva') || descLower.includes('apartado')) && !esRendimiento;
 
       let contabiliza = true;
       let etiquetaEspecial = '';
       let alertaImportacion = '';
-      if (esCuentaPropia) {
+      if (esCuentaPropia || esReservaInterna) {
         contabiliza = false;
-        etiquetaEspecial = 'Movimiento Interno';
+        etiquetaEspecial = esReservaInterna ? 'Movimiento Interno (Reserva/Frasco)' : 'Movimiento Interno';
       } else if (esRendimiento) {
         etiquetaEspecial = 'Rendimiento Billetera';
       } else if (esFondeo) {
@@ -230,6 +233,7 @@ export async function parsearMercadoPagoPdf(arrayBuffer, config = {}) {
         contabiliza,
         etiquetaEspecial,
         alertaImportacion,
+        esRendimiento,
         origen: `Mercado Pago (${titularDetectado})`
       });
     }
