@@ -5,7 +5,7 @@
 
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { parsearMontoMoneda } from './utils.js';
+import { parsearMontoMoneda, consolidarRendimientos } from './utils.js';
 
 if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
@@ -102,7 +102,7 @@ export function parsearMercadoPagoCsv(contenidoTexto, config = {}) {
     });
   }
 
-  return items;
+  return consolidarRendimientos(items, config.responsableDefault || 'Andres', 'Mercado Pago');
 }
 
 /**
@@ -240,5 +240,5 @@ export async function parsearMercadoPagoPdf(arrayBuffer, config = {}) {
   }
 
   items.responsableDetectado = titularDetectado;
-  return items;
+  return consolidarRendimientos(items, titularDetectado, 'Mercado Pago');
 }

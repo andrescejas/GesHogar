@@ -3,6 +3,7 @@
  * Parser para extractos mensuales en formato PDF de Cuenta / Billetera Virtual Naranja X.
  */
 import * as pdfjsLib from 'pdfjs-dist';
+import { consolidarRendimientos } from './utils.js';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -208,5 +209,5 @@ export async function parsearNaranjaXFile(arrayBuffer, config = {}) {
   }
 
   items.responsableDetectado = titularDetectado;
-  return items;
+  return consolidarRendimientos(items, titularDetectado, 'Naranja X');
 }
