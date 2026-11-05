@@ -3,7 +3,7 @@
  * Parser para extractos exportados desde Banco Santander (.xlsx / .xls / .csv)
  */
 import * as XLSX from 'xlsx';
-import { parsearMontoMoneda } from './utils.js';
+import { parsearMontoMoneda, consolidarRendimientos } from './utils.js';
 
 export function parsearSantanderFile(dataBufferOrString, config = {}) {
   const workbook = XLSX.read(dataBufferOrString, { type: typeof dataBufferOrString === 'string' ? 'string' : 'array' });
@@ -72,38 +72,38 @@ export function parsearSantanderFile(dataBufferOrString, config = {}) {
     const montoAbs = Math.abs(valorNumerico);
     const descLower = descRaw.toLowerCase();
 
-    // 1. Omitir rendimientos e intereses por saldo
-    if (descLower.includes('interes por saldo') || descLower.includes('rendimiento')) {
-      continue;
-    }
-
-    // 2. Omitir transferencias recibidas o enviadas de/hacia cuentas propias (mismo titular / hogar)
-    const esTransferenciaPropia = 
-      descLower.includes('justo jose andres cejas') ||
-      descLower.includes('justo jose andres ceja') ||
-      descLower.includes('cejas justo jose andres') ||
-      descLower.includes('maurizi cecilia soleda') ||
-      descLower.includes('maurizi cecilia soledad') ||
-      descLower.includes('27299691948') || // CUIT Cecilia (27-29969194-8)
-      descLower.includes('1980001730000001048879'); // CBU Bancor Cecilia (Transferencias sistema MEP)
-
-    if (esTransferenciaPropia) {
-      continue;
-    }
-
+    // Heurísticas de clasificación y movimientos no computables
+    const esRendimiento = descLower.includes('interes por saldo') || descLower.includes('rendimiento');
     const esPagoTarjeta = descLower.includes('pago de tarjeta de credito');
     const esSuscripcionFondo = descLower.includes('suscripcion fondos comunes');
     const esDebitoAuto = descLower.includes('deb.aut') || descLower.includes('debito automatico') || descLower.includes('debito directo');
 
+    // Transferencias internas entre cuentas propias o miembros del hogar
+    const esTransferenciaPropia = 
+      descLower.includes('justo jose andres') ||
+      descLower.includes('cejas justo jose') ||
+      descLower.includes('20260855833') || // CUIT Andrés
+      descLower.includes('maurizi cecilia') ||
+      descLower.includes('cecilia soledad maurizi') ||
+      descLower.includes('27299691948') || // CUIT Cecilia
+      descLower.includes('a su cta. mercado pago') ||
+      descLower.includes('cvu mismo titular');
+
     let contabiliza = true;
     let etiquetaEspecial = '';
 
-    if (esPagoTarjeta) {
+    if (esRendimiento) {
+      contabiliza = true;
+      etiquetaEspecial = 'Rendimiento Bancario';
+    } else if (esPagoTarjeta) {
       contabiliza = false;
       etiquetaEspecial = 'Pago Tarjeta (No computa)';
     } else if (esSuscripcionFondo) {
       contabiliza = false;
       etiquetaEspecial = 'Fondo Común (Inversión)';
+    } else if (esTransferenciaPropia) {
+      contabiliza = false;
+      etiquetaEspecial = 'Movimiento Interno';
     } else if (esDebitoAuto) {
       etiquetaEspecial = 'Débito Automático';
     }
@@ -119,7 +119,7 @@ export function parsearSantanderFile(dataBufferOrString, config = {}) {
       fecha,
       descripcion: descRaw,
       monto: montoAbs,
-      tipo: esEgreso ? 'egreso' : 'ingreso',
+      tipo: esRendimiento ? 'ingreso' : (esEgreso ? 'egreso' : 'ingreso'),
       medioPago: esEgreso ? 'Cuenta Bancaria' : 'Transferencia',
       tarjeta: tSantander?.id || 'santander_cuenta',
       responsable: config.responsableDefault || 'Andres',
@@ -127,6 +127,7 @@ export function parsearSantanderFile(dataBufferOrString, config = {}) {
       refId,
       contabiliza,
       etiquetaEspecial,
+      esRendimiento,
       origen: 'Banco Santander',
       esPagoTarjeta
     });
@@ -144,5 +145,5 @@ export function parsearSantanderFile(dataBufferOrString, config = {}) {
     if (idxBonif !== -1) items.splice(idxBonif, 1);
   }
 
-  return items;
+  return consolidarRendimientos(items, config.responsableDefault || 'Andres', 'Banco Santander');
 }

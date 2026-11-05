@@ -65,7 +65,7 @@ export const REGLAS_PREDETERMINADAS = [
 
   // Ingresos / Rescates de Inversión
   { pattern: /rescate|fondos comunes|supergestion/i, catNombre: 'Ingresos', subNombre: 'Rescate de fondos Santander' },
-  { pattern: /balanz/i, catNombre: 'Ingresos', subNombre: 'Rescate Balanz' },
+  { pattern: /balanz|sistema mep/i, catNombre: 'Ingresos', subNombre: 'Rescate Balanz' },
   { pattern: /rendimiento|rendimientos/i, catNombre: 'Ingresos', subNombre: 'Rendimientos' },
   { pattern: /capitaliz/i, catNombre: 'Ingresos', subNombre: 'Bonificaciones' },
   { pattern: /sec gral de la gobernacion|gobernacion/i, catNombre: 'Ingresos', subNombre: 'Sueldo Provincia' },
