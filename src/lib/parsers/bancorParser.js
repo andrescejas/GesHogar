@@ -64,7 +64,26 @@ export function parsearBancorFile(arrayBuffer, config = {}) {
     const descUpper = descripcion.toUpperCase();
     const esPagoTarjeta = descUpper.includes('TARJETA CORDOBESA') || descUpper.includes('TARJ.CORDOBESA');
     const esRendimiento = descUpper.includes('INTERES POR CAPITALIZACION') || descUpper.includes('CAPITALIZACION');
-    const esDebinBilletera = descUpper.includes('DEBIN') && (descUpper.includes('MERCADOLIBRE') || descUpper.includes('NARANJA'));
+
+    // Transferencias y débitos de cuentas propias o titulares del hogar
+    const esTransferenciaPropia = 
+      descUpper.includes('MAURIZI CECILIA') ||
+      descUpper.includes('MAURIZI, CECILIA') ||
+      descUpper.includes('CECILIA SOLEDAD MAURIZI') ||
+      descUpper.includes('27299691948') ||
+      descUpper.includes('CEJAS JUSTO') ||
+      descUpper.includes('JUSTO JOSE ANDRES') ||
+      descUpper.includes('20260855833');
+
+    const esDebin = descUpper.includes('DEBIN');
+    const esDebinFondeo = esDebin && (
+      esTransferenciaPropia ||
+      descUpper.includes('MERCADOLIBRE') ||
+      descUpper.includes('MERCADO PAGO') ||
+      descUpper.includes('NARANJA') ||
+      descUpper.includes('SANTANDER')
+    );
+
     const esDebitoAuto = descUpper.includes('DEB.AUT') || descUpper.includes('DEBITO AUTOMATICO') || descUpper.includes('DEBITO DIRECTO');
     const esHaberesSueldo = !esEgreso && (descUpper.includes('HABERES') || descUpper.includes('GOBERNACION') || descUpper.includes('SUELDO'));
 
@@ -75,6 +94,13 @@ export function parsearBancorFile(arrayBuffer, config = {}) {
     if (esPagoTarjeta) {
       contabiliza = false;
       etiquetaEspecial = 'Pago Tarjeta Cordobesa';
+    } else if (esDebinFondeo) {
+      contabiliza = false;
+      etiquetaEspecial = 'Movimiento Interno (Fondeo DEBIN)';
+      alertaImportacion = 'Fondeo de billetera o cuenta propia (no computa)';
+    } else if (esTransferenciaPropia && esEgreso) {
+      contabiliza = false;
+      etiquetaEspecial = 'Movimiento Interno';
     } else if (esHaberesSueldo) {
       contabiliza = true;
       etiquetaEspecial = 'Sueldo Provincia';
@@ -82,8 +108,6 @@ export function parsearBancorFile(arrayBuffer, config = {}) {
       etiquetaEspecial = 'Rendimiento Bancor';
     } else if (esDebitoAuto) {
       etiquetaEspecial = 'Débito Automático';
-    } else if (esDebinBilletera) {
-      alertaImportacion = 'Posible débito hacia billetera virtual (fondeo)';
     }
 
     const tBancor = config.tarjetas?.find(t => t.nombre?.toLowerCase().includes('bancor'));
