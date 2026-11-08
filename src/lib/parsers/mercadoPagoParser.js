@@ -55,11 +55,13 @@ export function parsearMercadoPagoCsv(contenidoTexto, config = {}) {
 
     // 2. Transferencias de/hacia cuentas propias (mismo titular / hogar)
     const esCuentaPropia = 
-      descLower.includes('cejas justo jose andres') ||
-      descLower.includes('justo jose andres cejas') ||
-      descLower.includes('justo jose andres ceja') ||
-      descLower.includes('maurizi cecilia soledad') ||
-      descLower.includes('maurizi cecilia soleda');
+      descLower.includes('justo jose andres') ||
+      descLower.includes('cejas justo') ||
+      descLower.includes('andres ceja') ||
+      descLower.includes('20260855833') ||
+      descLower.includes('maurizi cecilia') ||
+      descLower.includes('cecilia maurizi') ||
+      descLower.includes('27299691948');
 
     const esFondeo = descLower.includes('ingreso de dinero');
     const esReservaInterna = (descLower.includes('frasco') || descLower.includes('reserva') || descLower.includes('apartado')) && !esRendimiento;
@@ -67,10 +69,13 @@ export function parsearMercadoPagoCsv(contenidoTexto, config = {}) {
     let contabiliza = true;
     let etiquetaEspecial = '';
     let alertaImportacion = '';
+    let comentario = '';
 
     if (esCuentaPropia || esReservaInterna) {
       contabiliza = false;
       etiquetaEspecial = esReservaInterna ? 'Movimiento Interno (Reserva/Frasco)' : 'Movimiento Interno';
+      alertaImportacion = 'NO TILDAR: Transferencia entre cuentas del hogar';
+      comentario = 'Transferencia interna propia (no computa como gasto para no duplicar)';
     } else if (esRendimiento) {
       etiquetaEspecial = 'Rendimiento Billetera';
     } else if (esFondeo) {
@@ -97,6 +102,7 @@ export function parsearMercadoPagoCsv(contenidoTexto, config = {}) {
       contabiliza,
       etiquetaEspecial,
       alertaImportacion,
+      comentario,
       esRendimiento,
       origen: 'Mercado Pago'
     });
@@ -191,12 +197,13 @@ export async function parsearMercadoPagoPdf(arrayBuffer, config = {}) {
       const descLower = descripcionRaw.toLowerCase();
       const esRendimiento = descLower.includes('rendimiento');
       const esCuentaPropia =
-        descLower.includes('cejas justo jose andres') ||
-        descLower.includes('justo jose andres cejas') ||
-        descLower.includes('justo jose andres ceja') ||
-        descLower.includes('maurizi cecilia soledad') ||
-        descLower.includes('maurizi cecilia soleda') ||
-        descLower.includes('cecilia soledad maurizi');
+        descLower.includes('justo jose andres') ||
+        descLower.includes('cejas justo') ||
+        descLower.includes('andres ceja') ||
+        descLower.includes('20260855833') ||
+        descLower.includes('maurizi cecilia') ||
+        descLower.includes('cecilia maurizi') ||
+        descLower.includes('27299691948');
 
       const esFondeo = descLower.includes('ingreso de dinero');
       const esReservaInterna = (descLower.includes('frasco') || descLower.includes('reserva') || descLower.includes('apartado')) && !esRendimiento;
@@ -204,9 +211,12 @@ export async function parsearMercadoPagoPdf(arrayBuffer, config = {}) {
       let contabiliza = true;
       let etiquetaEspecial = '';
       let alertaImportacion = '';
+      let comentario = '';
       if (esCuentaPropia || esReservaInterna) {
         contabiliza = false;
         etiquetaEspecial = esReservaInterna ? 'Movimiento Interno (Reserva/Frasco)' : 'Movimiento Interno';
+        alertaImportacion = 'NO TILDAR: Transferencia entre cuentas del hogar';
+        comentario = 'Transferencia interna propia (no computa como gasto para no duplicar)';
       } else if (esRendimiento) {
         etiquetaEspecial = 'Rendimiento Billetera';
       } else if (esFondeo) {
@@ -233,6 +243,7 @@ export async function parsearMercadoPagoPdf(arrayBuffer, config = {}) {
         contabiliza,
         etiquetaEspecial,
         alertaImportacion,
+        comentario,
         esRendimiento,
         origen: `Mercado Pago (${titularDetectado})`
       });

@@ -148,14 +148,16 @@ export async function parsearNaranjaXFile(arrayBuffer, config = {}) {
       // Criterios de clasificación y no-cómputo
       const descUpper = descripcion.toUpperCase();
       const esTransferenciaPropia = 
-        descUpper.includes('JUSTO JOSE ANDRES CEJAS') || 
-        descUpper.includes('JUSTO JOSÉ ANDRÉS CEJAS') ||
-        descUpper.includes('CEJAS JUSTO JOSE ANDRES') ||
-        descUpper.includes('ANDRES CEJAS') ||
-        descUpper.includes('ANDRÉS CEJAS') ||
-        descUpper.includes('MAURIZI CECILIA SOLEDAD') ||
-        descUpper.includes('CECILIA SOLEDAD MAURIZI') ||
-        descUpper.includes('CECILIA MAURIZI');
+        descUpper.includes('JUSTO JOSE ANDRES') || 
+        descUpper.includes('JUSTO JOSÉ ANDRÉS') ||
+        descUpper.includes('CEJAS JUSTO') ||
+        descUpper.includes('ANDRES CEJA') ||
+        descUpper.includes('ANDRÉS CEJA') ||
+        descUpper.includes('20260855833') || // CUIT Andrés
+        descUpper.includes('MAURIZI CECILIA') ||
+        descUpper.includes('CECILIA MAURIZI') ||
+        descUpper.includes('27299691948');   // CUIT Cecilia
+
       const esFondoSilvana = 
         descUpper.includes('COCOS CAPITAL') || 
         descUpper.includes('MAURIZI SILVANA') ||
@@ -168,13 +170,18 @@ export async function parsearNaranjaXFile(arrayBuffer, config = {}) {
       let contabiliza = true;
       let etiquetaEspecial = '';
       let alertaImportacion = '';
+      let comentario = '';
 
       if (esTransferenciaPropia || esFrascoOReserva) {
         contabiliza = false;
         etiquetaEspecial = esFrascoOReserva ? 'Movimiento Interno (Reserva/Frasco)' : 'Movimiento Interno';
+        alertaImportacion = 'NO TILDAR: Transferencia entre cuentas del hogar';
+        comentario = 'Transferencia interna propia (no computa como gasto para no duplicar)';
       } else if (esFondoSilvana) {
         contabiliza = false;
         etiquetaEspecial = 'Fondos Terceros (Silvana)';
+        alertaImportacion = 'Fondos de terceros (Silvana Elena Maurizi)';
+        comentario = 'Movimiento de Silvana Maurizi';
       } else if (esRendimiento) {
         etiquetaEspecial = 'Rendimiento Billetera';
       } else if (esFondeo) {
@@ -199,6 +206,7 @@ export async function parsearNaranjaXFile(arrayBuffer, config = {}) {
         contabiliza,
         etiquetaEspecial,
         alertaImportacion,
+        comentario,
         esRendimiento,
         refId: nroOp || undefined,
         responsable: titularDetectado,
