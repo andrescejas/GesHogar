@@ -91,6 +91,8 @@ export function parsearSantanderFile(dataBufferOrString, config = {}) {
 
     let contabiliza = true;
     let etiquetaEspecial = '';
+    let alertaImportacion = '';
+    let comentario = '';
 
     if (esRendimiento) {
       contabiliza = true;
@@ -98,12 +100,18 @@ export function parsearSantanderFile(dataBufferOrString, config = {}) {
     } else if (esPagoTarjeta) {
       contabiliza = false;
       etiquetaEspecial = 'Pago Tarjeta (No computa)';
+      alertaImportacion = 'NO TILDAR: Los gastos ya se importan con el resumen de la tarjeta para no duplicar';
+      comentario = 'Pago de tarjeta (No tildar: los consumos reales se importan desde el resumen de Visa/Amex)';
     } else if (esSuscripcionFondo) {
       contabiliza = false;
       etiquetaEspecial = 'Fondo Común (Inversión)';
+      alertaImportacion = 'NO TILDAR: Suscripción a fondo de inversión (movimiento patrimonial neutro)';
+      comentario = 'Inversión en FCI (no computa como gasto de consumo)';
     } else if (esTransferenciaPropia) {
       contabiliza = false;
       etiquetaEspecial = 'Movimiento Interno';
+      alertaImportacion = 'NO TILDAR: Transferencia entre cuentas del hogar';
+      comentario = 'Transferencia interna propia (no computa como gasto para no duplicar)';
     } else if (esDebitoAuto) {
       etiquetaEspecial = 'Débito Automático';
     }
@@ -127,6 +135,8 @@ export function parsearSantanderFile(dataBufferOrString, config = {}) {
       refId,
       contabiliza,
       etiquetaEspecial,
+      alertaImportacion,
+      comentario,
       esRendimiento,
       origen: 'Banco Santander',
       esPagoTarjeta

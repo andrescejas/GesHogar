@@ -90,17 +90,23 @@ export function parsearBancorFile(arrayBuffer, config = {}) {
     let contabiliza = true;
     let etiquetaEspecial = '';
     let alertaImportacion = '';
+    let comentario = '';
 
     if (esPagoTarjeta) {
       contabiliza = false;
-      etiquetaEspecial = 'Pago Tarjeta Cordobesa';
+      etiquetaEspecial = 'Pago Tarjeta (No computa)';
+      alertaImportacion = 'NO TILDAR: Los gastos ya se importan con el resumen de la tarjeta para no duplicar';
+      comentario = 'Pago de resumen Cordobesa (No tildar: los consumos reales se importan desde el resumen de la tarjeta)';
     } else if (esDebinFondeo) {
       contabiliza = false;
       etiquetaEspecial = 'Movimiento Interno (Fondeo DEBIN)';
-      alertaImportacion = 'Fondeo de billetera o cuenta propia (no computa)';
+      alertaImportacion = 'NO TILDAR: Fondeo entre cuentas propias (los consumos se registran en la app de destino)';
+      comentario = 'Fondeo de cuenta propia (No tildar: el gasto real se computa en la app receptora)';
     } else if (esTransferenciaPropia && esEgreso) {
       contabiliza = false;
       etiquetaEspecial = 'Movimiento Interno';
+      alertaImportacion = 'NO TILDAR: Transferencia entre cuentas del hogar';
+      comentario = 'Transferencia interna propia (no computa como gasto para no duplicar)';
     } else if (esHaberesSueldo) {
       contabiliza = true;
       etiquetaEspecial = 'Sueldo Provincia';
@@ -126,6 +132,8 @@ export function parsearBancorFile(arrayBuffer, config = {}) {
       contabiliza,
       etiquetaEspecial,
       alertaImportacion,
+      comentario,
+      esPagoTarjeta,
       esRendimiento,
       origen: 'Banco de Córdoba (Bancor)'
     });
