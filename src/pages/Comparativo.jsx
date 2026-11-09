@@ -1,6 +1,7 @@
 import { Fragment, useState, useMemo } from 'react';
 import { useData } from '../context/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import Modal from '../components/ui/Modal';
 import { cn } from '../lib/utils';
 import { 
   AlertCircle, 
@@ -12,7 +13,11 @@ import {
   Calendar, 
   ChevronLeft, 
   ChevronRight,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Eye,
+  User,
+  CreditCard,
+  Receipt
 } from 'lucide-react';
 
 const getMesAnterior = (mesStr) => {
@@ -58,6 +63,9 @@ const Comparativo = () => {
   const [tipoFiltro, setTipoFiltro] = useState('egreso'); // 'egreso' | 'ingreso' | 'todos'
   const [filtroTexto, setFiltroTexto] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('todos'); // 'todos' | 'mas' | 'menos' | 'igual' | 'nada' | 'nuevo'
+
+  // Modal de auditoría de movimientos en el momento
+  const [detalleAudit, setDetalleAudit] = useState(null); // { tipo: 'sub' | 'cat', item, categoria }
 
   // Navegación rápida de meses
   const irMesAnterior = () => setMes(prev => getMesAnterior(prev));
@@ -202,6 +210,8 @@ const Comparativo = () => {
 
         return {
           ...sub,
+          categoriaId: cat.id,
+          categoriaNombre: cat.nombre,
           montoActual,
           montoAnterior,
           diferencia,
@@ -281,6 +291,47 @@ const Comparativo = () => {
   const porcentajeTotalMoM = totalMoMAnterior > 0 
     ? ((totalMoMActual - totalMoMAnterior) / totalMoMAnterior) * 100 
     : 0;
+
+  // ==========================================
+  // 3. AUDITORÍA DETALLADA DE MOVIMIENTOS
+  // ==========================================
+  const movimientosAuditados = useMemo(() => {
+    if (!detalleAudit) return { actual: [], anterior: [] };
+    const { tipo, item, categoria } = detalleAudit;
+
+    const filterMov = (m, targetMes) => {
+      const matchFecha = m.fecha && m.fecha.startsWith(targetMes);
+      const matchContabiliza = m.contabiliza !== false;
+      const matchEstado = m.estado !== 'proyectado';
+      const matchTipo = tipoFiltro === 'todos' ? (m.tipo === categoria.tipo) : (m.tipo === tipoFiltro);
+      const matchCat = m.categoriaId === categoria.id || m.categoria === categoria.nombre;
+
+      if (!matchFecha || !matchContabiliza || !matchEstado || !matchTipo || !matchCat) {
+        return false;
+      }
+
+      if (tipo === 'sub') {
+        const isSinSub = item.id === 'sin-sub';
+        const subsCat = subcategorias.filter(s => s.categoriaId === categoria.id);
+        const matchSub = isSinSub 
+          ? (!m.subcategoriaId || !subsCat.some(s => s.id === m.subcategoriaId)) 
+          : (m.subcategoriaId === item.id || m.subcategoria === item.nombre);
+        return matchSub;
+      }
+
+      return true;
+    };
+
+    const actual = movimientos
+      .filter(m => filterMov(m, mes))
+      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+    const anterior = movimientos
+      .filter(m => filterMov(m, mesAnterior))
+      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+    return { actual, anterior };
+  }, [detalleAudit, movimientos, mes, mesAnterior, tipoFiltro, subcategorias]);
 
   return (
     <div className="space-y-6">
@@ -493,7 +544,7 @@ const Comparativo = () => {
                   Detalle Comparativo por Categoría y Subcategoría
                 </CardTitle>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Variación de montos entre {getNombreMes(mesAnterior)} y {getNombreMes(mes)}.
+                  Variación de montos entre {getNombreMes(mesAnterior)} y {getNombreMes(mes)}. Haz clic en una fila o en el botón para ver sus movimientos.
                 </p>
               </div>
               <div className="flex items-center gap-3 text-xs font-semibold">
@@ -520,19 +571,19 @@ const Comparativo = () => {
                       <th className="h-11 px-4 text-right align-middle text-muted-foreground">Diferencia</th>
                       <th className="h-11 px-4 text-right align-middle text-muted-foreground">Variación (%)</th>
                       <th className="h-11 px-4 text-center align-middle text-muted-foreground">Estado</th>
+                      <th className="h-11 px-3 text-center align-middle text-muted-foreground">Detalle</th>
                     </tr>
                   </thead>
                   <tbody className="[&_tr:last-child]:border-0">
                     {comparativaMoM.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-10 text-muted-foreground">
+                        <td colSpan={7} className="text-center py-10 text-muted-foreground">
                           No se encontraron movimientos computables para los filtros seleccionados.
                         </td>
                       </tr>
                     ) : (
                       comparativaMoM.map((c) => {
                         const esEgreso = c.tipo === 'egreso';
-                        const difPositivaEsMala = esEgreso;
                         const esAhorro = c.diferencia < 0;
 
                         return (
@@ -586,6 +637,16 @@ const Comparativo = () => {
                                   {c.estadoLabel}
                                 </span>
                               </td>
+                              <td className="p-3.5 align-middle text-center">
+                                <button
+                                  onClick={() => setDetalleAudit({ tipo: 'cat', item: c, categoria: c })}
+                                  title={`Auditar movimientos de ${c.nombre}`}
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold bg-background hover:bg-muted text-muted-foreground hover:text-foreground transition-colors border shadow-2xs"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span className="hidden sm:inline">Ver todo</span>
+                                </button>
+                              </td>
                             </tr>
 
                             {/* Filas de Subcategorías Hijas */}
@@ -593,10 +654,15 @@ const Comparativo = () => {
                               const subAhorro = sub.diferencia < 0;
 
                               return (
-                                <tr key={sub.id} className="border-b transition-colors hover:bg-muted/30 text-sm">
-                                  <td className="p-2.5 pl-9 align-middle text-foreground font-medium flex items-center gap-1.5">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                                    <span>{sub.nombre}</span>
+                                <tr 
+                                  key={sub.id} 
+                                  onClick={() => setDetalleAudit({ tipo: 'sub', item: sub, categoria: c })}
+                                  className="border-b transition-colors hover:bg-primary/5 cursor-pointer text-sm group"
+                                  title="Haz clic para ver el detalle de movimientos de ambos meses"
+                                >
+                                  <td className="p-2.5 pl-9 align-middle text-foreground font-medium flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-slate-400 group-hover:bg-primary transition-colors" />
+                                    <span className="group-hover:text-primary transition-colors">{sub.nombre}</span>
                                   </td>
                                   <td className="p-2.5 align-middle text-right text-muted-foreground font-normal">
                                     ${sub.montoAnterior.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -633,6 +699,19 @@ const Comparativo = () => {
                                     )}>
                                       {sub.estadoLabel}
                                     </span>
+                                  </td>
+                                  <td className="p-2.5 align-middle text-center">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDetalleAudit({ tipo: 'sub', item: sub, categoria: c });
+                                      }}
+                                      title="Ver detalle de movimientos"
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground transition-all border border-primary/20 shadow-2xs"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                      <span>Detalle</span>
+                                    </button>
                                   </td>
                                 </tr>
                               );
@@ -762,6 +841,202 @@ const Comparativo = () => {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 4. MODAL DE AUDITORÍA COMPARATIVA DE MOVIMIENTOS          */}
+      {/* ========================================================= */}
+      {detalleAudit && (
+        <Modal
+          isOpen={!!detalleAudit}
+          onClose={() => setDetalleAudit(null)}
+          title={
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">{detalleAudit.categoria.icono}</span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-foreground">
+                    {detalleAudit.item.nombre}
+                  </h3>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-muted font-semibold text-muted-foreground border">
+                    {detalleAudit.categoria.nombre}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground font-normal mt-0.5">
+                  Auditoría de tickets y transacciones que justifican la variación
+                </p>
+              </div>
+            </div>
+          }
+          maxWidth="max-w-5xl"
+        >
+          <div className="space-y-6">
+            {/* Banner Resumen del Rubro */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-muted/40 p-3.5 rounded-xl border text-sm">
+              <div>
+                <p className="text-xs text-muted-foreground font-medium">{getNombreMes(mesAnterior)}</p>
+                <p className="text-base font-bold text-foreground mt-0.5">
+                  ${detalleAudit.item.montoAnterior.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <span className="text-[11px] text-muted-foreground">
+                  {movimientosAuditados.anterior.length} movimiento(s)
+                </span>
+              </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground font-medium">{getNombreMes(mes)}</p>
+                <p className="text-base font-bold text-foreground mt-0.5">
+                  ${detalleAudit.item.montoActual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <span className="text-[11px] text-muted-foreground">
+                  {movimientosAuditados.actual.length} movimiento(s)
+                </span>
+              </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground font-medium">Diferencia Neta</p>
+                <p className={cn(
+                  "text-base font-black mt-0.5",
+                  detalleAudit.item.diferencia === 0 
+                    ? "text-foreground" 
+                    : (detalleAudit.categoria.tipo === 'egreso' 
+                        ? (detalleAudit.item.diferencia < 0 ? "text-emerald-600" : "text-rose-600")
+                        : (detalleAudit.item.diferencia >= 0 ? "text-emerald-600" : "text-rose-600"))
+                )}>
+                  {detalleAudit.item.diferencia > 0 ? '+' : ''}${detalleAudit.item.diferencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <span className="text-[11px] font-semibold text-muted-foreground">
+                  {detalleAudit.item.porcentaje !== null 
+                    ? `${detalleAudit.item.porcentaje > 0 ? '+' : ''}${detalleAudit.item.porcentaje.toFixed(1)}%`
+                    : 'N/A'}
+                </span>
+              </div>
+
+              <div className="flex flex-col justify-center items-start sm:items-end">
+                <p className="text-xs text-muted-foreground font-medium mb-1">Diagnóstico</p>
+                <span className={cn(
+                  "px-3 py-1 rounded-full text-xs font-bold border",
+                  detalleAudit.item.badgeClass
+                )}>
+                  {detalleAudit.item.estadoLabel}
+                </span>
+              </div>
+            </div>
+
+            {/* Columnas Comparativas Paralelas */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Columna 1: Mes Anterior */}
+              <div className="border rounded-xl p-4 bg-card flex flex-col h-full shadow-2xs">
+                <div className="flex items-center justify-between border-b pb-2 mb-3">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <span className="font-bold text-sm text-foreground">{getNombreMes(mesAnterior)}</span>
+                  </div>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                    Total: ${detalleAudit.item.montoAnterior.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                <div className="space-y-2 overflow-y-auto max-h-[380px] pr-1">
+                  {movimientosAuditados.anterior.length === 0 ? (
+                    <div className="py-12 text-center text-xs text-muted-foreground border border-dashed rounded-lg">
+                      No se registraron movimientos en {getNombreMes(mesAnterior)}.
+                    </div>
+                  ) : (
+                    movimientosAuditados.anterior.map((m, idx) => (
+                      <div 
+                        key={m.id || idx} 
+                        className="p-2.5 rounded-lg border bg-muted/20 hover:bg-muted/40 transition-colors text-xs flex flex-col gap-1.5"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="font-semibold text-foreground break-words flex-1">
+                            {m.descripcion || 'Sin descripción'}
+                          </span>
+                          <span className="font-black text-sm text-foreground whitespace-nowrap">
+                            ${Number(m.monto || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground pt-1 border-t border-border/50">
+                          <span className="font-medium bg-background px-1.5 py-0.5 rounded border">
+                            {m.fecha ? m.fecha.split('-').reverse().join('/') : 'Sin fecha'}
+                          </span>
+                          {m.responsable && (
+                            <span className="flex items-center gap-1 font-medium bg-background px-1.5 py-0.5 rounded border">
+                              <User className="w-3 h-3" />
+                              {m.responsable}
+                            </span>
+                          )}
+                          {(m.medioPago || m.tarjeta) && (
+                            <span className="flex items-center gap-1 bg-background px-1.5 py-0.5 rounded border">
+                              <CreditCard className="w-3 h-3" />
+                              {m.medioPago || 'Tarjeta'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Columna 2: Mes Seleccionado */}
+              <div className="border rounded-xl p-4 bg-card flex flex-col h-full shadow-2xs">
+                <div className="flex items-center justify-between border-b pb-2 mb-3">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-primary" />
+                    <span className="font-bold text-sm text-foreground">{getNombreMes(mes)}</span>
+                  </div>
+                  <span className="text-xs font-black px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                    Total: ${detalleAudit.item.montoActual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                <div className="space-y-2 overflow-y-auto max-h-[380px] pr-1">
+                  {movimientosAuditados.actual.length === 0 ? (
+                    <div className="py-12 text-center text-xs text-muted-foreground border border-dashed rounded-lg">
+                      No se registraron movimientos en {getNombreMes(mes)}.
+                    </div>
+                  ) : (
+                    movimientosAuditados.actual.map((m, idx) => (
+                      <div 
+                        key={m.id || idx} 
+                        className="p-2.5 rounded-lg border bg-primary/[0.03] hover:bg-primary/[0.07] border-primary/20 transition-colors text-xs flex flex-col gap-1.5"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="font-semibold text-foreground break-words flex-1">
+                            {m.descripcion || 'Sin descripción'}
+                          </span>
+                          <span className="font-black text-sm text-foreground whitespace-nowrap">
+                            ${Number(m.monto || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground pt-1 border-t border-border/50">
+                          <span className="font-medium bg-background px-1.5 py-0.5 rounded border">
+                            {m.fecha ? m.fecha.split('-').reverse().join('/') : 'Sin fecha'}
+                          </span>
+                          {m.responsable && (
+                            <span className="flex items-center gap-1 font-medium bg-background px-1.5 py-0.5 rounded border">
+                              <User className="w-3 h-3" />
+                              {m.responsable}
+                            </span>
+                          )}
+                          {(m.medioPago || m.tarjeta) && (
+                            <span className="flex items-center gap-1 bg-background px-1.5 py-0.5 rounded border">
+                              <CreditCard className="w-3 h-3" />
+                              {m.medioPago || 'Tarjeta'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );
